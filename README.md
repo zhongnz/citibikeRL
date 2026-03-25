@@ -1,14 +1,18 @@
-# CitiBikeRL — Repository Setup for RL Project Delivery
+# CitiBikeRL — Model-free Policy Evaluation for Small-Scale Rebalancing
 
-This repository is now structured for a reinforcement learning course project on Citi Bike rebalancing, with emphasis on **organization first** (proposal, report, presentation, reproducibility), before implementation code.
+This repository supports a reinforcement-learning course project on Citi Bike rebalancing.
+It combines:
+- **organization-first delivery** (proposal/report/presentation workflows), and
+- **build-ready structure** (package skeleton, dataset scripts, validation checks).
 
-## Project objective (current stage)
+## Project overview
 
-Create a clean, team-friendly workspace that supports:
-- proposal development,
-- data provenance tracking,
-- experiment-ready folder boundaries,
-- final report and presentation production.
+### Problem
+Bike-share systems can become imbalanced: some stations run out of bikes while others have excess inventory.
+This hurts served trips and increases unmet demand.
+
+### Core idea
+Model hourly rebalancing decisions as an MDP, train/evaluate a tabular Q-learning policy, and compare against a **Do Not Refill** baseline.
 
 ---
 
@@ -18,6 +22,8 @@ Create a clean, team-friendly workspace that supports:
 citibikeRL/
 ├── README.md
 ├── .gitignore
+├── pyproject.toml
+├── Makefile
 ├── data/
 │   ├── raw/                    # immutable source datasets
 │   ├── processed/              # transformed/aggregated data
@@ -31,54 +37,52 @@ citibikeRL/
 │   ├── papers/                 # literature PDFs/notes
 │   ├── datasets/               # data source links/schema/provenance
 │   └── figures/                # reference images and diagrams
-├── configs/                    # future yaml/json config files
+├── configs/                    # dataset and experiment config files
 ├── notebooks/                  # EDA and exploratory analysis
-├── src/citibikerl/             # future implementation package
-├── scripts/                    # future reproducible CLI scripts
+├── src/citibikerl/             # implementation package
+├── scripts/                    # CLI utilities and data pipeline scripts
 ├── outputs/
 │   ├── figures/                # generated charts
 │   ├── tables/                 # result tables
 │   ├── models/                 # checkpoints / Q tables
 │   └── logs/                   # run logs
-└── tests/                      # future automated checks
+└── tests/                      # automated checks
 ```
 
 ---
 
-## What to put where (practical)
+## Build and structure checks
 
-- Put original Citi Bike downloads in `data/raw/` and do not edit them.
-- Put derived datasets in `data/processed/`.
-- Track source URLs and schema notes in `references/datasets/`.
-- Keep proposal/report/slides in `docs/` subfolders (with versioned filenames).
-- Keep generated plots and tables in `outputs/` so report assets are traceable.
-
----
-
-## Team delivery workflow
-
-1. **Proposal phase**
-   - Use `docs/proposal/README.md` checklist.
-
-2. **Planning and coordination**
-   - Record decisions in `docs/notes/`.
-
-3. **Data documentation phase**
-   - Fill `references/datasets/CITIBIKE_DATA_SOURCE.md`.
-
-4. **Experiment phase (later)**
-   - Keep reusable logic in `src/`, runner scripts in `scripts/`.
-
-5. **Final delivery phase**
-   - Report assets in `docs/report/`.
-   - Presentation assets in `docs/presentation/`.
+```bash
+make check-structure
+make build-check
+```
 
 ---
 
+## Dataset-ready commands
+
+```bash
+python scripts/get_dataset.py --url <DATASET_URL> --output data/raw/JC-202602-citibike-tripdata.csv
+make dataset-validate INPUT=data/raw/JC-202602-citibike-tripdata.csv
+make preprocess-data INPUT=data/raw/JC-202602-citibike-tripdata.csv OUTPUT=data/processed/hourly_flows.csv
+```
+
+These commands now provide a minimal end-to-end data path: download → schema validate → preprocess hourly flows.
+
+---
+
+## Documentation and project operations
+
+- Workflow commands: `docs/WORKFLOW.md`
+- Execution plan and priorities: `docs/NEXT_STEPS.md`
+- Weekly status board: `docs/STATUS.md`
+- Dataset provenance template: `references/datasets/CITIBIKE_DATA_SOURCE.md`
+
+---
 
 ## Starter templates included
 
-To make the repo immediately usable, starter templates are already provided:
 - `docs/proposal/proposal_outline.md`
 - `docs/report/report_outline.md`
 - `docs/report/figure_inventory.md`
@@ -88,61 +92,3 @@ To make the repo immediately usable, starter templates are already provided:
 - `docs/notes/decision_log.md`
 - `docs/notes/action_items.md`
 - `references/papers/reading_list.md`
-
----
-
-
-## Quick validation command
-
-Run this any time to confirm the scaffold is intact:
-
-```bash
-make check-structure
-```
-
----
-
-## Immediate next actions
-
-- Add your proposal document to `docs/proposal/`.
-- Add at least one dataset provenance entry in `references/datasets/CITIBIKE_DATA_SOURCE.md`.
-- Create the first meeting note in `docs/notes/`.
-- Draft report outline in `docs/report/` and slide outline in `docs/presentation/`.
-
-This keeps the repo simple, consistent, and ready for implementation when you start coding.
-
-
-## Operations cheatsheet
-
-See `docs/WORKFLOW.md` for day-to-day commands (validate scaffold, create meeting notes, create report drafts).
-
-For the execution sequence, see `docs/NEXT_STEPS.md`.
-
-Track milestone progress in `docs/STATUS.md`.
-
-
-## Build started (v0.1)
-
-The repository now includes an initial Python package build scaffold:
-- `pyproject.toml`
-- `src/citibikerl/` package with version + CLI check
-- `scripts/preprocess_data.py` starter entry point
-
-Quick checks:
-```bash
-make check-structure
-make build-check
-```
-
-
-
-## Dataset-ready commands
-
-Once you have a dataset URL:
-
-```bash
-python scripts/get_dataset.py --url <DATASET_URL> --output data/raw/JC-202602-citibike-tripdata.csv
-make dataset-validate INPUT=data/raw/JC-202602-citibike-tripdata.csv
-make preprocess-data INPUT=data/raw/JC-202602-citibike-tripdata.csv OUTPUT=data/processed/hourly_flows.csv
-```
-
