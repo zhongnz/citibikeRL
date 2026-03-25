@@ -1,7 +1,10 @@
-.PHONY: check-conflicts check-structure build-check dataset-validate preprocess-data new-meeting new-report-draft
+.PHONY: check-conflicts verify-merge-clean check-structure build-check dataset-validate preprocess-data new-meeting new-report-draft
 
 check-conflicts:
 	./scripts/check_conflicts.sh
+
+verify-merge-clean: check-conflicts
+	git diff --check
 
 check-structure: check-conflicts
 	./scripts/check_structure.sh
