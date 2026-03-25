@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "citibikerl"
+version = "0.1.0"
+description = "CitiBike RL project scaffold and baseline utilities"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "CitiBikeRL Team" }]
+dependencies = [
+  "numpy>=1.26",
+  "pandas>=2.1",
+  "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "ruff>=0.5",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[project.scripts]
+citibikerl-build-check = "citibikerl.cli:main"
