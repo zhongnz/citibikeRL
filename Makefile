@@ -1,6 +1,9 @@
-.PHONY: check-structure build-check dataset-validate preprocess-data new-meeting new-report-draft
+.PHONY: check-conflicts check-structure build-check dataset-validate preprocess-data new-meeting new-report-draft
 
-check-structure:
+check-conflicts:
+	./scripts/check_conflicts.sh
+
+check-structure: check-conflicts
 	./scripts/check_structure.sh
 
 build-check:

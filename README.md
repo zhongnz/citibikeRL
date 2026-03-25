@@ -54,6 +54,7 @@ citibikeRL/
 ## Build and structure checks
 
 ```bash
+make check-conflicts
 make check-structure
 make build-check
 ```

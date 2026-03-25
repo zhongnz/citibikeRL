@@ -10,6 +10,7 @@ Store reproducible command-line entry points.
 - `evaluate_baseline.py`
 - `make_plots.py`
 - `check_structure.sh`
+- `check_conflicts.sh`
 - `new_meeting_note.sh`
 - `new_report_draft.sh`
 
@@ -27,3 +28,5 @@ Each script should:
 Run `make build-check` to validate imports and compile Python sources.
 
 Use `make dataset-validate INPUT=<raw_csv>` before preprocessing.
+
+- `check_conflicts.sh` fails if merge conflict markers are found.
