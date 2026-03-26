@@ -1,96 +1,51 @@
-# Next Steps (Execution Plan)
+# Next Steps
 
-This is the recommended sequence to move from scaffold to a complete course project.
+The project is no longer in scaffold mode. The remaining work is final-mile research packaging and a small amount of robustness follow-up.
 
-## Priority 0 — Team alignment (Day 1)
+## What is done
 
-1. Finalize station sample scope (which 5 stations and why).
-2. Confirm project success metrics:
-   - served trips,
-   - unmet demand,
-   - cumulative reward,
-   - refill action count.
-3. Assign owners for:
-   - data + EDA,
-   - environment + baseline,
-   - report + slides.
+1. Citi Bike demand and NOAA weather data are ingested with provenance.
+2. The five-station environment, no-op baseline, heuristic baseline, tabular Q-learning path, and DQN path are implemented.
+3. The primary evaluation protocol is fixed:
+   train on January 2025 through January 2026 and test on February 2026.
+4. Report-ready figures and a draft report now exist.
 
-Deliverables:
-- Update `docs/notes/decision_log.md`.
-- Create one meeting note with `make new-meeting`.
+## What remains
 
----
+### Priority 1 — Finalize the written claim
 
-## Priority 1 — Data readiness (Days 1–3)
-
-1. Download the target Citi Bike file into `data/raw/`.
-2. Record provenance in `references/datasets/CITIBIKE_DATA_SOURCE.md`.
-3. Create one EDA notebook (`notebooks/01_data_overview.ipynb`) with:
-   - key columns sanity checks,
-   - hourly demand overview,
-   - station frequency summary.
+1. Convert `docs/report/report_draft_v1.md` into the final report.
+2. Keep the main claim conservative:
+   the heuristic is the strongest robust policy, while the regularized DQN is promising but unstable.
+3. Pull final figure references from `docs/report/figure_inventory.md`.
 
 Deliverables:
-- Data provenance entry completed.
-- One EDA notebook checked in.
 
----
-
-## Priority 2 — Environment spec freeze (Days 3–5)
-
-1. Freeze MDP choices in proposal/report outlines:
-   - state variables,
-   - action space,
-   - transition order,
-   - reward terms.
-2. Lock the baseline definition (**Do Not Refill**).
-3. Confirm evaluation protocol (episode horizon, number of runs, comparison method).
-
-Deliverables:
-- Updated `docs/proposal/proposal_outline.md` with finalized assumptions.
-- Updated `docs/report/report_outline.md` with final methods/evaluation wording.
-
----
-
-## Priority 3 — Minimal implementation start (Week 2)
-
-1. Implement data preprocessing script.
-2. Implement environment simulation.
-3. Implement baseline policy rollout.
-4. Implement tabular Q-learning training loop.
-
-Deliverables:
-- First runnable end-to-end pipeline producing metrics into `outputs/tables/`.
-
----
-
-## Priority 4 — Results and analysis (Week 2–3)
-
-1. Run baseline and Q-learning comparisons.
-2. Generate core figures into `outputs/figures/`.
-3. Fill `docs/report/figure_inventory.md` with source paths.
-
-Deliverables:
-- Initial result table + at least 2 figures.
-
----
-
-## Priority 5 — Final report and presentation (Final week)
-
-1. Draft and finalize `docs/report/report_draft_vX.md`.
-2. Build final slide deck from `docs/presentation/slide_outline.md`.
-3. Complete `docs/presentation/asset_checklist.md`.
-
-Deliverables:
 - Final report PDF.
-- Final presentation deck + speaker notes.
 
----
+### Priority 2 — Finish the presentation
 
-## Immediate 3-task recommendation (start now)
+1. Turn `docs/presentation/slide_outline.md` into the actual deck.
+2. Add the seed-sweep robustness table to the slides.
+3. Export PDF and PPTX and complete `docs/presentation/asset_checklist.md`.
 
-If you only do three things next, do these first:
+Deliverables:
 
-1. Add the real dataset file and provenance entry.
-2. Create `notebooks/01_data_overview.ipynb`.
-3. Finalize the exact 5-station sample decision in `docs/notes/decision_log.md`.
+- Final slide deck.
+- Speaker notes.
+
+### Priority 3 — Optional but valuable robustness work
+
+1. Run more DQN seeds on the final regularized setup.
+2. If time permits, test residual learning around the heuristic baseline.
+3. If a stronger claim is needed, hold out an additional future month rather than tuning further on February.
+
+Deliverables:
+
+- Expanded robustness appendix or extra table.
+
+## Immediate 3-task recommendation
+
+1. Build the final slide deck from the updated slide outline.
+2. Export the report draft to PDF after one editing pass.
+3. Decide whether the team wants to claim "best run" or "robust winner"; the current evidence supports only the latter for the heuristic.

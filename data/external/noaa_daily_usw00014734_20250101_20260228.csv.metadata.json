@@ -1,0 +1,17 @@
+{
+  "source_url": "https://www.ncei.noaa.gov/access/services/data/v1?dataset=daily-summaries&stations=USW00014734&startDate=2025-01-01&endDate=2026-02-28&dataTypes=TAVG%2CTMAX%2CTMIN%2CPRCP%2CSNOW%2CAWND&includeAttributes=false&units=metric&format=json",
+  "station": "USW00014734",
+  "start_date": "2025-01-01",
+  "end_date": "2026-02-28",
+  "row_count": 424,
+  "columns": [
+    "day",
+    "station_id",
+    "temperature_c",
+    "temperature_max_c",
+    "temperature_min_c",
+    "precipitation_mm",
+    "snowfall_mm",
+    "wind_speed_m_s"
+  ]
+}

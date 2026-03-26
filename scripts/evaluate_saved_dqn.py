@@ -1,0 +1,110 @@
+#!/usr/bin/env python3
+"""Evaluate a previously saved DQN policy."""
+
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
+
+import pandas as pd
+
+from citibikerl.rebalancing import (
+    DQNPolicy,
+    DemandProfilePolicy,
+    NoOpPolicy,
+    build_dense_state_encoder,
+    evaluate_dqn_policy,
+    evaluate_policy,
+    load_demand_dataset,
+    load_dqn_model,
+    summarize_metrics,
+)
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Evaluate a saved DQN policy.")
+    parser.add_argument("--input", required=True, help="Processed hourly flows CSV or comma-separated CSVs")
+    parser.add_argument("--weather-input", help="Optional NOAA daily weather CSV aligned by day")
+    parser.add_argument("--model", required=True, help="Saved model JSON from train_dqn.py")
+    parser.add_argument("--output", required=True, help="Output CSV for per-episode metrics")
+    parser.add_argument("--skip-baseline", action="store_true", help="Only evaluate the saved DQN policy")
+    parser.add_argument("--move-action-margin", type=float, help="Override the saved no_op margin before taking move actions")
+    return parser.parse_args()
+
+
+def main() -> int:
+    args = parse_args()
+    saved_model = load_dqn_model(args.model)
+    dataset = load_demand_dataset(
+        args.input,
+        station_ids=saved_model.station_ids,
+        top_n_stations=len(saved_model.station_ids),
+        weather_input=args.weather_input,
+    )
+
+    state_encoder = build_dense_state_encoder(
+        demand_profile=saved_model.demand_profile,
+        station_capacity=saved_model.env_config.station_capacity,
+    )
+    trained_policy = DQNPolicy(
+        network_state=saved_model.network_state,
+        state_encoder=state_encoder,
+        dueling=saved_model.training_config.dueling,
+        move_action_margin=float(
+            saved_model.training_config.move_action_margin
+            if args.move_action_margin is None
+            else args.move_action_margin,
+        ),
+    )
+
+    metrics_frames = []
+    if not args.skip_baseline:
+        baseline_metrics = evaluate_policy(
+            dataset,
+            saved_model.env_config,
+            NoOpPolicy(),
+            bucket_size=saved_model.training_config.heuristic_bucket_size,
+            policy_name="baseline_no_op",
+        )
+        heuristic_metrics = evaluate_policy(
+            dataset,
+            saved_model.env_config,
+            DemandProfilePolicy(
+                actions=saved_model.actions,
+                demand_profile=saved_model.demand_profile,
+                bucket_size=saved_model.training_config.heuristic_bucket_size,
+                station_capacity=saved_model.env_config.station_capacity,
+                move_amount=saved_model.env_config.move_amount,
+            ),
+            bucket_size=saved_model.training_config.heuristic_bucket_size,
+            policy_name="heuristic_demand_profile",
+        )
+        metrics_frames.append(pd.DataFrame(baseline_metrics))
+        metrics_frames.append(pd.DataFrame(heuristic_metrics))
+
+    trained_metrics = evaluate_dqn_policy(
+        dataset,
+        saved_model.env_config,
+        trained_policy,
+        policy_name="saved_dqn_policy",
+    )
+    metrics_frames.append(pd.DataFrame(trained_metrics))
+
+    output_path = Path(args.output)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    pd.concat(metrics_frames, ignore_index=True).to_csv(output_path, index=False)
+
+    trained_summary = summarize_metrics(trained_metrics)
+    print(f"Evaluated saved DQN policy across {dataset.num_episodes} episode(s) and {dataset.num_stations} station(s).")
+    print(f"Selected stations: {', '.join(dataset.station_ids)}")
+    print(
+        "Saved DQN avg reward={avg_reward:.2f}, served={avg_served_trips:.2f}, unmet={avg_unmet_demand:.2f}".format(
+            **trained_summary,
+        ),
+    )
+    print(f"Wrote metrics to: {output_path}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

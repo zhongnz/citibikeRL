@@ -4,6 +4,7 @@ This repository supports a reinforcement-learning course project on Citi Bike re
 It combines:
 - **organization-first delivery** (proposal/report/presentation workflows), and
 - **build-ready structure** (package skeleton, dataset scripts, validation checks).
+- **first runnable RL slice** (environment simulation, baseline evaluation, tabular Q-learning).
 
 ## Project overview
 
@@ -65,11 +66,81 @@ make build-check
 
 ```bash
 python scripts/get_dataset.py --url <DATASET_URL> --output data/raw/JC-202602-citibike-tripdata.csv
+python scripts/get_weather_data.py \
+  --station USW00014734 \
+  --start-date 2025-01-01 \
+  --end-date 2026-02-28 \
+  --output data/external/noaa_daily_usw00014734_20250101_20260228.csv
 make dataset-validate INPUT=data/raw/JC-202602-citibike-tripdata.csv
 make preprocess-data INPUT=data/raw/JC-202602-citibike-tripdata.csv OUTPUT=data/processed/hourly_flows.csv
 ```
 
 These commands now provide a minimal end-to-end data path: download → schema validate → preprocess hourly flows.
+`get_dataset.py` now writes a per-file metadata sidecar and updates `data/raw/_dataset_metadata.json` so multiple monthly downloads keep their provenance.
+`get_weather_data.py` downloads normalized NOAA daily summaries that can be passed into experiment commands with `--weather-input`.
+
+---
+
+## Training and evaluation commands
+
+```bash
+make evaluate-baseline INPUT=data/processed/hourly_flows.csv OUTPUT=outputs/tables/baseline_metrics.csv
+make train-q-learning \
+  INPUT=data/processed/hourly_flows.csv \
+  MODEL=outputs/models/q_learning_model.json \
+  TRAINING_METRICS=outputs/tables/training_metrics.csv \
+  EVAL_METRICS=outputs/tables/policy_evaluation.csv
+make train-dqn \
+  INPUT=data/processed/hourly_flows.csv \
+  MODEL=outputs/models/dqn_model.json \
+  TRAINING_METRICS=outputs/tables/dqn_training_metrics.csv \
+  EVAL_METRICS=outputs/tables/dqn_policy_evaluation.csv
+make evaluate-saved-policy \
+  INPUT=data/processed/hourly_flows.csv \
+  MODEL=outputs/models/q_learning_model.json \
+  OUTPUT=outputs/tables/saved_policy_evaluation.csv
+make evaluate-saved-dqn \
+  INPUT=data/processed/hourly_flows.csv \
+  MODEL=outputs/models/dqn_model.json \
+  OUTPUT=outputs/tables/saved_dqn_policy_evaluation.csv
+make run-experiment \
+  INPUT=data/processed/hourly_flows.csv \
+  PREFIX=baseline_v1
+make run-experiment \
+  INPUT=data/processed/jc_202601_hourly_flows.csv,data/processed/hourly_flows.csv \
+  PREFIX=month_holdout_v1
+PYTHONPATH=src python scripts/run_experiment.py \
+  --input data/processed/jc_202501_hourly_flows.csv,data/processed/jc_202502_hourly_flows.csv \
+  --weather-input data/external/noaa_daily_usw00014734_20250101_20260228.csv \
+  --output-prefix weather_holdout_v1
+make make-plots \
+  TRAINING_METRICS=outputs/tables/training_metrics.csv \
+  EVAL_METRICS=outputs/tables/policy_evaluation.csv \
+  REWARD_PLOT=outputs/figures/training_reward_curve.png \
+  COMPARISON_PLOT=outputs/figures/policy_comparison.png
+```
+
+What the first implementation supports:
+- selects the top-activity stations from the processed flow file,
+- accepts one or many processed monthly CSVs via a comma-separated `INPUT`,
+- simulates hourly bike inventory with no-op or bike-transfer actions,
+- evaluates a **Do Not Refill / no-op** baseline,
+- evaluates a training-data-driven demand-profile heuristic baseline,
+- trains a tabular Q-learning agent on daily episodes using a compact forecast-aware state,
+- also supports a NumPy dueling Double DQN path using dense forecast, calendar, holiday, and optional weather features,
+- derives U.S. federal holiday flags for every demand day and can merge NOAA daily weather context via `--weather-input`,
+- falls back to the encoded heuristic action when the Q-table encounters an unseen or low-visit forecast state,
+- uses a chronological train/test split across available days by default,
+- also supports an explicit `test_start_day` cutoff for month-holdout evaluation,
+- saves training metrics, evaluation metrics, and a serialized Q-table,
+- reloads a saved Q-table for later evaluation,
+- runs a complete experiment in one command with reproducible artifact names,
+- generates reward and policy-comparison figures for the report.
+
+Default runtime settings live in:
+- `configs/environment.yaml`
+- `configs/training.yaml`
+- `configs/evaluation.yaml`
 
 ---
 

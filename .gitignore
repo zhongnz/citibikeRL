@@ -23,6 +23,7 @@ Thumbs.db
 
 # Data and outputs that can become large
 # Keep folders tracked with .gitkeep, but avoid committing large files by default.
+data/raw/*.csv
 data/raw/*.zip
 data/raw/*.parquet
 data/raw/*.feather
@@ -31,5 +32,6 @@ outputs/logs/*
 
 # Allow keepfiles
 !data/raw/.gitkeep
+!data/raw/README.md
 !outputs/models/.gitkeep
 !outputs/logs/.gitkeep

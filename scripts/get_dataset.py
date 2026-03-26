@@ -31,9 +31,23 @@ def main() -> int:
         "downloaded_at_utc": datetime.now(UTC).isoformat(),
         "path": str(output_path),
     }
+    sidecar_metadata_path = Path(f"{output_path}.metadata.json")
+    sidecar_metadata_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+
     metadata_path = output_path.parent / "_dataset_metadata.json"
-    metadata_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
-    print(f"Wrote metadata: {metadata_path}")
+    existing_records: list[dict[str, str]] = []
+    if metadata_path.exists():
+        existing_payload = json.loads(metadata_path.read_text(encoding="utf-8"))
+        if isinstance(existing_payload, list):
+            existing_records = [record for record in existing_payload if isinstance(record, dict)]
+        elif isinstance(existing_payload, dict):
+            existing_records = [existing_payload]
+
+    updated_records = [record for record in existing_records if record.get("path") != str(output_path)]
+    updated_records.append(meta)
+    metadata_path.write_text(json.dumps(updated_records, indent=2), encoding="utf-8")
+    print(f"Wrote metadata sidecar: {sidecar_metadata_path}")
+    print(f"Updated metadata index: {metadata_path}")
     return 0
 
 
