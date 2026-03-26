@@ -32,8 +32,8 @@ Use this file as a single source of truth for weekly progress.
 | Data & preprocessing | team | Done | Citi Bike and NOAA data ingested with provenance |
 | Environment & baseline | team | Done | No-op and demand-profile heuristic implemented |
 | Training & evaluation | team | In review | Seasonal holdout complete; DQN seed stability still weak |
-| Report writing | team | In progress | Draft v1 and figure inventory prepared |
-| Presentation | team | In progress | Slide outline ready; deck not exported |
+| Report writing | team | Done | Draft and exported PDF exist under `docs/report/` |
+| Presentation | team | Done | Deck PDF/PPTX, notes, and backup slides exist under `docs/presentation/` |
 
 ---
 
@@ -43,4 +43,4 @@ Use this file as a single source of truth for weekly progress.
 |---|---|---|---|
 | DQN improvement is not stable across seeds | High | Report the seed sweep explicitly; present the heuristic as the strongest robust baseline | team |
 | Final claim could overstate one strong DQN run | High | Center the writeup on robustness, not best-case reward | team |
-| Presentation assets are still not assembled into a deck | Medium | Convert slide outline into deck and export PDF/PPTX | team |
+| Final claim could still be overstated without care | Medium | Keep the heuristic as the strongest robust policy in the final presentation and report | team |
