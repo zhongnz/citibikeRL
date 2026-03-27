@@ -33,6 +33,7 @@ Each script should:
 Run `make build-check` to validate imports and compile Python sources.
 
 Use `make dataset-validate INPUT=<raw_csv>` before preprocessing.
+The validation and preprocessing scripts now read required columns and timezone from `configs/dataset.yaml` by default, or from `--dataset-config` when overridden.
 
 Use `make get-weather-data STATION=<noaa_station> START_DATE=<yyyy-mm-dd> END_DATE=<yyyy-mm-dd> OUTPUT=<weather_csv>` to fetch normalized NOAA daily weather summaries.
 

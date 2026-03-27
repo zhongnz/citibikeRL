@@ -4,10 +4,14 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
-from .schema import REQUIRED_COLUMNS
+from .schema import DEFAULT_REQUIRED_COLUMNS
 
 
-def missing_required_columns(columns: Iterable[str]) -> list[str]:
+def missing_required_columns(
+    columns: Iterable[str],
+    required_columns: Iterable[str] | None = None,
+) -> list[str]:
     """Return missing required schema columns."""
     present = set(columns)
-    return [col for col in REQUIRED_COLUMNS if col not in present]
+    required = list(DEFAULT_REQUIRED_COLUMNS if required_columns is None else required_columns)
+    return [col for col in required if col not in present]

@@ -7,6 +7,11 @@ Store slides and talk materials.
 - `deck_v1.pptx` / `deck_final.pptx`
 - `speaker_notes.md`
 - `backup_slides.md`
+- `assets/` for deck-local figures referenced by markdown source
+
+## Export
+
+Run `make export-presentation` from the repo root to rebuild `deck_final.pptx` and `deck_final.pdf`.
 
 ## Slide flow (recommended)
 1. Problem and motivation

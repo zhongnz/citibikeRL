@@ -1,4 +1,6 @@
-.PHONY: check-conflicts verify-merge-clean check-structure build-check dataset-validate preprocess-data get-weather-data train-q-learning train-dqn evaluate-baseline evaluate-saved-policy evaluate-saved-dqn run-experiment make-plots new-meeting new-report-draft
+.PHONY: check-conflicts verify-merge-clean check-structure build-check dataset-validate preprocess-data get-weather-data train-q-learning train-dqn evaluate-baseline evaluate-saved-policy evaluate-saved-dqn run-experiment make-plots export-presentation new-meeting new-report-draft
+
+DATASET_CONFIG ?= configs/dataset.yaml
 
 check-conflicts:
 	./scripts/check_conflicts.sh
@@ -14,10 +16,10 @@ build-check:
 	PYTHONPATH=src python -m citibikerl.cli
 
 dataset-validate:
-	PYTHONPATH=src python scripts/validate_dataset.py --input $(INPUT)
+	PYTHONPATH=src python scripts/validate_dataset.py --input $(INPUT) --dataset-config $(DATASET_CONFIG)
 
 preprocess-data:
-	PYTHONPATH=src python scripts/preprocess_data.py --input $(INPUT) --output $(OUTPUT)
+	PYTHONPATH=src python scripts/preprocess_data.py --input $(INPUT) --output $(OUTPUT) --dataset-config $(DATASET_CONFIG)
 
 get-weather-data:
 	PYTHONPATH=src python scripts/get_weather_data.py --station $(STATION) --start-date $(START_DATE) --end-date $(END_DATE) --output $(OUTPUT)
@@ -42,6 +44,9 @@ run-experiment:
 
 make-plots:
 	PYTHONPATH=src python scripts/make_plots.py --training-metrics $(TRAINING_METRICS) --evaluation-metrics $(EVAL_METRICS) --reward-plot $(REWARD_PLOT) --comparison-plot $(COMPARISON_PLOT)
+
+export-presentation:
+	cd docs/presentation && pandoc deck_final.md -o deck_final.pptx && pandoc deck_final.md -o deck_final.pdf
 
 new-meeting:
 	./scripts/new_meeting_note.sh

@@ -78,6 +78,7 @@ make preprocess-data INPUT=data/raw/JC-202602-citibike-tripdata.csv OUTPUT=data/
 These commands now provide a minimal end-to-end data path: download → schema validate → preprocess hourly flows.
 `get_dataset.py` now writes a per-file metadata sidecar and updates `data/raw/_dataset_metadata.json` so multiple monthly downloads keep their provenance.
 `get_weather_data.py` downloads normalized NOAA daily summaries that can be passed into experiment commands with `--weather-input`.
+`configs/dataset.yaml` is now the authoritative source for raw-dataset required columns and preprocessing timezone.
 
 ---
 

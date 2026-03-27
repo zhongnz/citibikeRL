@@ -8,29 +8,42 @@ import csv
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
-from citibikerl.data import missing_required_columns
+from citibikerl.data import load_dataset_settings, missing_required_columns
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Preprocess Citi Bike raw data.")
     parser.add_argument("--input", required=True, help="Path to raw input CSV")
     parser.add_argument("--output", required=True, help="Path to write processed CSV")
+    parser.add_argument(
+        "--dataset-config",
+        default="configs/dataset.yaml",
+        help="YAML file with dataset settings such as required columns and timezone",
+    )
     return parser.parse_args()
 
 
-def parse_hour(timestamp: str) -> str | None:
+def parse_hour(timestamp: str, timezone: str) -> str | None:
     try:
         dt = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
     except ValueError:
         return None
-    return dt.replace(minute=0, second=0, microsecond=0).isoformat()
+
+    target_timezone = ZoneInfo(timezone)
+    if dt.tzinfo is None:
+        localized_dt = dt.replace(tzinfo=target_timezone)
+    else:
+        localized_dt = dt.astimezone(target_timezone)
+    return localized_dt.replace(minute=0, second=0, microsecond=0).isoformat()
 
 
 def main() -> int:
     args = parse_args()
     input_path = Path(args.input)
     output_path = Path(args.output)
+    dataset_settings = load_dataset_settings(args.dataset_config)
 
     if not input_path.exists():
         print(f"Input does not exist: {input_path}")
@@ -42,7 +55,7 @@ def main() -> int:
             print("Cannot preprocess: CSV header row not found.")
             return 1
 
-        missing = missing_required_columns(reader.fieldnames)
+        missing = missing_required_columns(reader.fieldnames, dataset_settings.required_columns)
         if missing:
             print("Cannot preprocess: missing required columns:")
             for col in missing:
@@ -51,7 +64,7 @@ def main() -> int:
 
         grouped: dict[tuple[str, str, str], int] = defaultdict(int)
         for row in reader:
-            hour = parse_hour(row["started_at"])
+            hour = parse_hour(row["started_at"], dataset_settings.timezone)
             if hour is None:
                 continue
             key = (hour, row["start_station_id"], row["end_station_id"])

@@ -9,9 +9,9 @@
 
 Ready figures:
 
-- `outputs/figures/jc_2025_full_year_to_202602_holdout_weather_v1_policy_comparison.png`
-- `outputs/figures/jc_2025_full_year_to_202602_holdout_dqn_margin_v1_policy_comparison.png`
-- `outputs/figures/jc_2025_full_year_to_202602_holdout_dqn_margin_v1_training_reward_curve.png`
+- `docs/presentation/assets/jc_2025_full_year_to_202602_holdout_weather_v1_policy_comparison.png`
+- `docs/presentation/assets/jc_2025_full_year_to_202602_holdout_dqn_margin_v1_policy_comparison.png`
+- `docs/presentation/assets/jc_202602_top5_calendar_heuristic_v1_policy_comparison.png`
 
 Exported presentation files:
 

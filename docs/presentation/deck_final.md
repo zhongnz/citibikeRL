@@ -52,7 +52,7 @@
 - Calendar features helped tabular Q-learning close the gap to no-op.
 - But the demand-profile heuristic still won clearly.
 
-![](outputs/figures/jc_202602_top5_calendar_heuristic_v1_policy_comparison.png){ width=90% }
+![](assets/jc_202602_top5_calendar_heuristic_v1_policy_comparison.png){ width=90% }
 
 # Main Seasonal Holdout Result
 
@@ -62,7 +62,7 @@
 - Heuristic baseline: `122.45`
 - Weather-aware tabular Q: `122.21`
 
-![](outputs/figures/jc_2025_full_year_to_202602_holdout_weather_v1_policy_comparison.png){ width=90% }
+![](assets/jc_2025_full_year_to_202602_holdout_weather_v1_policy_comparison.png){ width=90% }
 
 # DQN Result and Caveat
 
@@ -71,7 +71,7 @@
   `123.63` vs heuristic `122.45`
 - But that win was not stable across seeds.
 
-![](outputs/figures/jc_2025_full_year_to_202602_holdout_dqn_margin_v1_policy_comparison.png){ width=90% }
+![](assets/jc_2025_full_year_to_202602_holdout_dqn_margin_v1_policy_comparison.png){ width=90% }
 
 # Robustness Check
 

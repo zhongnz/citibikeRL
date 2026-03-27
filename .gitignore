@@ -27,11 +27,15 @@ data/raw/*.csv
 data/raw/*.zip
 data/raw/*.parquet
 data/raw/*.feather
+outputs/figures/*
+outputs/tables/*
 outputs/models/*
 outputs/logs/*
 
 # Allow keepfiles
 !data/raw/.gitkeep
 !data/raw/README.md
+!outputs/figures/.gitkeep
+!outputs/tables/.gitkeep
 !outputs/models/.gitkeep
 !outputs/logs/.gitkeep
