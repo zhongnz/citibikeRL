@@ -74,6 +74,10 @@ def parse_args() -> argparse.Namespace:
         help="Bucket size for demand-aware Q-state summary features",
     )
     parser.add_argument("--seed", type=int, help="RNG seed")
+    parser.add_argument(
+        "--state-representation",
+        help="Q-table state representation tag (forecast_profile_v1..v4)",
+    )
     return parser.parse_args()
 
 
@@ -135,6 +139,13 @@ def main() -> int:
             first_not_none(args.forecast_bucket_size, training_values.get("forecast_bucket_size"), 2),
         ),
         seed=int(first_not_none(args.seed, training_values.get("seed"), 7)),
+        state_representation=str(
+            first_not_none(
+                args.state_representation,
+                training_values.get("state_representation"),
+                "forecast_profile_v4",
+            ),
+        ),
     )
 
     summary = run_experiment(

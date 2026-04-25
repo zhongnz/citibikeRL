@@ -39,6 +39,7 @@ class TrainingConfig:
     heuristic_exploration_bias: float = 0.0
     min_state_visit_count: int = 1
     seed: int = 7
+    state_representation: str = FORECAST_STATE_REPRESENTATION
 
 
 @dataclass(frozen=True)
@@ -77,7 +78,7 @@ def train_q_learning(
         env_config=env_config,
         training_config=training_config,
         demand_profile=demand_profile,
-        state_representation=FORECAST_STATE_REPRESENTATION,
+        state_representation=training_config.state_representation,
     )
     heuristic_policy = build_demand_profile_policy(
         actions=env.actions,
@@ -162,7 +163,7 @@ def train_q_learning(
         metrics=metrics,
         actions=env.actions,
         demand_profile=demand_profile,
-        state_representation=FORECAST_STATE_REPRESENTATION,
+        state_representation=training_config.state_representation,
     )
 
 
