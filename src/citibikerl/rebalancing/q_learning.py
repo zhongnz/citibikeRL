@@ -186,17 +186,21 @@ def evaluate_policy(
     for demand_episode in range(dataset.num_episodes):
         observation = env.reset(demand_episode)
         state = encoder(observation)
+        fallback_actions_before = _counter_value(policy, "fallback_count")
+        trusted_q_actions_before = _counter_value(policy, "trusted_q_count")
         total_reward = 0.0
         served_trips = 0.0
         unmet_demand = 0.0
         moved_bikes = 0
         overflow_bikes = 0.0
+        action_count = 0
 
         done = False
         while not done:
             action = policy.select_action(state, env.num_actions)
             next_observation, reward, done, info = env.step(action)
             state = encoder(next_observation)
+            action_count += 1
             total_reward += reward
             served_trips += float(info["served_trips"])
             unmet_demand += float(info["unmet_demand"])
@@ -213,6 +217,9 @@ def evaluate_policy(
                 "unmet_demand": unmet_demand,
                 "moved_bikes": moved_bikes,
                 "overflow_bikes": overflow_bikes,
+                "action_count": action_count,
+                "fallback_actions": _counter_value(policy, "fallback_count") - fallback_actions_before,
+                "trusted_q_actions": _counter_value(policy, "trusted_q_count") - trusted_q_actions_before,
             },
         )
 
@@ -228,6 +235,8 @@ def summarize_metrics(metrics: list[dict[str, float | int | str]]) -> dict[str, 
             "avg_unmet_demand": 0.0,
             "avg_moved_bikes": 0.0,
             "avg_overflow_bikes": 0.0,
+            "avg_fallback_actions": 0.0,
+            "avg_trusted_q_actions": 0.0,
         }
 
     return {
@@ -236,7 +245,13 @@ def summarize_metrics(metrics: list[dict[str, float | int | str]]) -> dict[str, 
         "avg_unmet_demand": float(np.mean([float(metric["unmet_demand"]) for metric in metrics])),
         "avg_moved_bikes": float(np.mean([float(metric["moved_bikes"]) for metric in metrics])),
         "avg_overflow_bikes": float(np.mean([float(metric["overflow_bikes"]) for metric in metrics])),
+        "avg_fallback_actions": float(np.mean([float(metric.get("fallback_actions", 0.0)) for metric in metrics])),
+        "avg_trusted_q_actions": float(np.mean([float(metric.get("trusted_q_actions", 0.0)) for metric in metrics])),
     }
+
+
+def _counter_value(policy: Policy, counter_name: str) -> int:
+    return int(getattr(policy, counter_name, 0))
 
 
 def encode_state(

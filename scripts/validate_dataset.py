@@ -7,7 +7,7 @@ import argparse
 import csv
 from pathlib import Path
 
-from citibikerl.data import load_dataset_settings, missing_required_columns
+from citibikerl.data import load_dataset_settings, missing_required_columns, open_csv_text
 
 
 def parse_args() -> argparse.Namespace:
@@ -30,7 +30,7 @@ def main() -> int:
         print(f"Input dataset not found: {input_path}")
         return 1
 
-    with input_path.open("r", encoding="utf-8", newline="") as f:
+    with open_csv_text(input_path) as f:
         reader = csv.DictReader(f)
         if reader.fieldnames is None:
             print("Dataset schema invalid: header row not found.")

@@ -2,6 +2,9 @@
 
 from pathlib import Path
 
+import pytest
+
+from citibikerl.config import load_yaml_section
 from citibikerl.data import load_dataset_settings, missing_required_columns
 
 
@@ -44,3 +47,35 @@ def test_load_dataset_settings_reads_yaml_overrides(tmp_path: Path) -> None:
 
     assert settings.timezone == "UTC"
     assert settings.required_columns == ("started_at", "bike_type")
+
+
+def test_load_yaml_section_fails_for_missing_explicit_path(tmp_path: Path) -> None:
+    missing_path = tmp_path / "missing.yaml"
+
+    with pytest.raises(FileNotFoundError):
+        load_yaml_section(missing_path, "training")
+
+
+def test_load_yaml_section_returns_empty_dict_when_section_absent(tmp_path: Path) -> None:
+    config_path = tmp_path / "dataset.yaml"
+    config_path.write_text(
+        "dataset:\n  timezone: UTC\n",
+        encoding="utf-8",
+    )
+
+    assert load_yaml_section(config_path, "training") == {}
+
+
+def test_load_yaml_section_returns_empty_dict_when_section_value_is_null(tmp_path: Path) -> None:
+    config_path = tmp_path / "training.yaml"
+    config_path.write_text("training:\n", encoding="utf-8")
+
+    assert load_yaml_section(config_path, "training") == {}
+
+
+def test_load_yaml_section_rejects_non_mapping_section(tmp_path: Path) -> None:
+    config_path = tmp_path / "training.yaml"
+    config_path.write_text("training:\n  - 1\n  - 2\n", encoding="utf-8")
+
+    with pytest.raises(ValueError):
+        load_yaml_section(config_path, "training")

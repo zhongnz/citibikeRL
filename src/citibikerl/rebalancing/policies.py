@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 
@@ -35,7 +35,7 @@ class ForecastHeuristicPolicy:
         return action
 
 
-@dataclass(frozen=True)
+@dataclass
 class QTablePolicy:
     """Greedy policy derived from a learned Q-table."""
 
@@ -43,16 +43,22 @@ class QTablePolicy:
     state_visit_counts: dict[State, int] | None = None
     min_visit_count: int = 1
     fallback_policy: Policy | None = None
+    selection_count: int = field(default=0, init=False)
+    fallback_count: int = field(default=0, init=False)
+    trusted_q_count: int = field(default=0, init=False)
 
     def select_action(self, state: State, action_count: int) -> int:
+        self.selection_count += 1
         values = self.q_table.get(state)
         visit_count = self.min_visit_count if self.state_visit_counts is None else int(self.state_visit_counts.get(state, 0))
         if values is None or visit_count < self.min_visit_count:
+            self.fallback_count += 1
             if self.fallback_policy is not None:
                 return int(self.fallback_policy.select_action(state, action_count))
             return 0
         if len(values) != action_count:
             raise ValueError("Q-table action count does not match the environment.")
+        self.trusted_q_count += 1
         return int(np.argmax(values))
 
 

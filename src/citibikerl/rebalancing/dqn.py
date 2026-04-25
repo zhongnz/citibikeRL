@@ -262,11 +262,13 @@ def evaluate_dqn_policy(
         unmet_demand = 0.0
         moved_bikes = 0
         overflow_bikes = 0.0
+        action_count = 0
 
         done = False
         while not done:
             action = policy.select_action(observation, env.num_actions)
             observation, reward, done, info = env.step(action)
+            action_count += 1
             total_reward += reward
             served_trips += float(info["served_trips"])
             unmet_demand += float(info["unmet_demand"])
@@ -283,6 +285,9 @@ def evaluate_dqn_policy(
                 "unmet_demand": unmet_demand,
                 "moved_bikes": moved_bikes,
                 "overflow_bikes": overflow_bikes,
+                "action_count": action_count,
+                "fallback_actions": 0,
+                "trusted_q_actions": 0,
             },
         )
 

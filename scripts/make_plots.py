@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import argparse
 
-from citibikerl.rebalancing import plot_policy_comparison, plot_training_rewards
+from citibikerl.rebalancing.reporting import plot_policy_comparison, plot_training_rewards
 
 
 def parse_args() -> argparse.Namespace:

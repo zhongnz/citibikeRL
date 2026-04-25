@@ -1,5 +1,5 @@
 {
   "url": "https://tripdata.s3.amazonaws.com/JC-202505-citibike-tripdata.csv.zip",
   "downloaded_at_utc": "2026-03-26T16:19:35.382267+00:00",
-  "path": "/home/ptz/dev/rl/citibikeRL/data/raw/JC-202505-citibike-tripdata.csv.zip"
+  "path": "data/raw/JC-202505-citibike-tripdata.csv.zip"
 }

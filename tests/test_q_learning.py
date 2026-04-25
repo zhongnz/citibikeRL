@@ -142,11 +142,26 @@ def test_encode_forecast_state_tracks_profile_action_signal() -> None:
     assert state == (1, 6, 1, 2, 2, 0, 5, 0, 0, 3, 1, 0, 4, 1, 4, 3, 7)
 
 
+def test_forecast_heuristic_policy_returns_no_op_for_short_state() -> None:
+    policy = ForecastHeuristicPolicy()
+
+    assert policy.select_action((1, 2, 3), action_count=5) == 0
+
+
+def test_forecast_heuristic_policy_returns_no_op_for_out_of_range_action() -> None:
+    state = (5, 1, 0, 9, 2)
+    policy = ForecastHeuristicPolicy()
+
+    assert policy.select_action(state, action_count=5) == 0
+
+
 def test_q_table_policy_can_fallback_to_embedded_heuristic_action() -> None:
     state = (5, 1, 0, 7, 2, 4, 3, 2)
     policy = QTablePolicy({}, fallback_policy=ForecastHeuristicPolicy())
 
     assert policy.select_action(state, 10) == 7
+    assert policy.fallback_count == 1
+    assert policy.trusted_q_count == 0
 
 
 def test_q_table_policy_can_fallback_when_state_has_too_few_visits() -> None:
@@ -159,6 +174,38 @@ def test_q_table_policy_can_fallback_when_state_has_too_few_visits() -> None:
     )
 
     assert policy.select_action(state, 10) == 7
+    assert policy.fallback_count == 1
+    assert policy.trusted_q_count == 0
+
+
+def test_evaluate_policy_reports_q_table_fallback_usage() -> None:
+    dataset = DemandDataset(
+        station_ids=("A", "B"),
+        episode_days=("2026-02-01",),
+        departures=np.asarray([[[0.0, 0.0], [4.0, 0.0]]]),
+        arrivals=np.asarray([[[0.0, 3.0], [0.0, 0.0]]]),
+    )
+    env_config = RebalancingEnvConfig(
+        station_capacity=5,
+        initial_inventory=1,
+        move_amount=3,
+        served_reward=1.0,
+        unmet_penalty=2.0,
+        move_penalty_per_bike=0.0,
+        overflow_penalty=0.0,
+    )
+    metrics = evaluate_policy(
+        dataset,
+        env_config,
+        QTablePolicy({}, fallback_policy=ForecastHeuristicPolicy()),
+        bucket_size=1,
+        policy_name="trained",
+        state_encoder=lambda _observation: (5, 1, 0, 0),
+    )
+
+    assert metrics[0]["action_count"] == 2
+    assert metrics[0]["fallback_actions"] == 2
+    assert metrics[0]["trusted_q_actions"] == 0
 
 
 def test_demand_profile_policy_beats_no_op_on_simple_rebalancing_problem() -> None:

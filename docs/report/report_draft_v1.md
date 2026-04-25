@@ -20,7 +20,7 @@ The environment models hourly bike demand over a five-station subset. The final 
 - `JC009`
 - `JC109`
 
-These stations were selected by total start-plus-end activity over the training window in [jc_2025_full_year_to_202602_holdout_weather_v1_selected_stations.csv](/home/ptz/dev/rl/citibikeRL/outputs/tables/jc_2025_full_year_to_202602_holdout_weather_v1_selected_stations.csv).
+These stations were selected by total start-plus-end activity over the training window in [jc_2025_full_year_to_202602_holdout_weather_v1_selected_stations.csv](../../outputs/tables/jc_2025_full_year_to_202602_holdout_weather_v1_selected_stations.csv).
 
 At each step, the policy chooses either `no_op` or a directed transfer of a fixed number of bikes from one station to another. The reward function combines:
 
@@ -33,11 +33,11 @@ This formulation intentionally rewards service improvement while making unnecess
 
 ## 3. Data and Preprocessing
 
-Trip demand comes from official Jersey City Citi Bike monthly files covering January 2025 through February 2026, documented in [CITIBIKE_DATA_SOURCE.md](/home/ptz/dev/rl/citibikeRL/references/datasets/CITIBIKE_DATA_SOURCE.md). Raw trips are validated and aggregated into hourly origin-destination flows under `data/processed/jc_YYYYMM_hourly_flows.csv`.
+Trip demand comes from official Jersey City Citi Bike monthly files covering January 2025 through February 2026, documented in [CITIBIKE_DATA_SOURCE.md](../../references/datasets/CITIBIKE_DATA_SOURCE.md). Raw trips are validated and aggregated into hourly origin-destination flows under `data/processed/jc_YYYYMM_hourly_flows.csv`.
 
-The primary experiment uses all 14 processed monthly files. The resulting dataset contains 423 daily demand episodes, of which 396 are used for training and 27 February 2026 episodes are used for testing. Daily weather context comes from NOAA station `USW00014734`, documented in [NOAA_WEATHER_SOURCE.md](/home/ptz/dev/rl/citibikeRL/references/datasets/NOAA_WEATHER_SOURCE.md).
+The primary experiment uses all 14 processed monthly files. The resulting dataset contains 423 daily demand episodes, of which 396 are used for training and 27 February 2026 episodes are used for testing. Daily weather context comes from NOAA station `USW00014734`, documented in [NOAA_WEATHER_SOURCE.md](../../references/datasets/NOAA_WEATHER_SOURCE.md).
 
-Exploratory analysis is captured in [01_data_overview.ipynb](/home/ptz/dev/rl/citibikeRL/notebooks/01_data_overview.ipynb).
+Exploratory analysis is captured in [01_data_overview.ipynb](../../notebooks/01_data_overview.ipynb).
 
 ## 4. Methods
 
@@ -55,7 +55,7 @@ RL methods
 
 The tabular path starts with simple inventory states, then adds calendar features, forecast-profile features, and finally holiday/weather context. The deep RL path replaces the Q-table with a dense dueling Double DQN over calendar, inventory, weather, and demand-profile features.
 
-The main regularization added to the DQN is a `no_op` margin gate implemented in [dqn.py](/home/ptz/dev/rl/citibikeRL/src/citibikerl/rebalancing/dqn.py). The policy only takes a move action when the predicted Q-value for that move exceeds the `no_op` Q-value by a configured margin. Otherwise it chooses `no_op`. This targets the main failure mode seen in early DQN runs: over-moving bikes on weak value differences.
+The main regularization added to the DQN is a `no_op` margin gate implemented in [dqn.py](../../src/citibikerl/rebalancing/dqn.py). The policy only takes a move action when the predicted Q-value for that move exceeds the `no_op` Q-value by a configured margin. Otherwise it chooses `no_op`. This targets the main failure mode seen in early DQN runs: over-moving bikes on weak value differences.
 
 ## 5. Evaluation Protocol
 
@@ -66,7 +66,7 @@ The final evaluation is chronological.
 - Train episodes: 396
 - Test episodes: 27
 
-This split is recorded in [jc_2025_full_year_to_202602_holdout_weather_v1_experiment_summary.json](/home/ptz/dev/rl/citibikeRL/outputs/logs/jc_2025_full_year_to_202602_holdout_weather_v1_experiment_summary.json).
+This split is recorded in [jc_2025_full_year_to_202602_holdout_weather_v1_experiment_summary.json](../../outputs/logs/jc_2025_full_year_to_202602_holdout_weather_v1_experiment_summary.json).
 
 Primary metrics are:
 
@@ -82,9 +82,9 @@ Primary metrics are:
 
 The early within-February split shows why the heuristic became the key benchmark. On the 21-train-day / 7-test-day setup, the initial tabular Q-policy underperformed `baseline_no_op` (`121.12` vs `122.50` average reward). Adding calendar features brought the tabular policy up to `122.48`, nearly matching the no-op baseline but still far below the heuristic. Once the demand-profile heuristic was added, it reached `127.47` average reward on the same split. These results are recorded in:
 
-- [jc_202602_top5_split_v1_policy_evaluation.csv](/home/ptz/dev/rl/citibikeRL/outputs/tables/jc_202602_top5_split_v1_policy_evaluation.csv)
-- [jc_202602_top5_calendar_v1_policy_evaluation.csv](/home/ptz/dev/rl/citibikeRL/outputs/tables/jc_202602_top5_calendar_v1_policy_evaluation.csv)
-- [jc_202602_top5_calendar_heuristic_v1_policy_evaluation.csv](/home/ptz/dev/rl/citibikeRL/outputs/tables/jc_202602_top5_calendar_heuristic_v1_policy_evaluation.csv)
+- [jc_202602_top5_split_v1_policy_evaluation.csv](../../outputs/tables/jc_202602_top5_split_v1_policy_evaluation.csv)
+- [jc_202602_top5_calendar_v1_policy_evaluation.csv](../../outputs/tables/jc_202602_top5_calendar_v1_policy_evaluation.csv)
+- [jc_202602_top5_calendar_heuristic_v1_policy_evaluation.csv](../../outputs/tables/jc_202602_top5_calendar_heuristic_v1_policy_evaluation.csv)
 
 ### 6.2 Seasonal holdout
 
@@ -94,9 +94,9 @@ The more important result is the year-to-February holdout. On that split:
 |---|---:|---:|---:|
 | No-op baseline | 109.33 | 12.48 | 0.00 |
 | Demand-profile heuristic | 122.45 | 8.07 | 9.11 |
-| Weather-aware tabular Q | 122.21 | 8.15 | 9.22 |
+| Q table with heuristic fallback | 122.21 | 8.15 | 9.22 |
 
-These numbers come from [jc_2025_full_year_to_202602_holdout_weather_v1_policy_evaluation.csv](/home/ptz/dev/rl/citibikeRL/outputs/tables/jc_2025_full_year_to_202602_holdout_weather_v1_policy_evaluation.csv). The weather-aware tabular model nearly matches the heuristic but does not beat it.
+These numbers come from [jc_2025_full_year_to_202602_holdout_weather_v1_policy_evaluation.csv](../../outputs/tables/jc_2025_full_year_to_202602_holdout_weather_v1_policy_evaluation.csv). The tabular Q policy nearly matches the heuristic because the strict future-month states are almost all unseen: it averages `23.96` fallback actions and only `0.04` trusted Q-table actions per 24-hour holdout episode.
 
 ### 6.3 DQN and move regularization
 
@@ -108,7 +108,7 @@ The unregularized DQN improves representation power but introduces a new problem
 | DQN without move margin | 122.12 | 8.19 | 44.63 |
 | DQN with move margin, seed 7 | 123.63 | 8.30 | 20.07 |
 
-The unregularized DQN result is in [jc_2025_full_year_to_202602_holdout_dqn_v2_policy_evaluation.csv](/home/ptz/dev/rl/citibikeRL/outputs/tables/jc_2025_full_year_to_202602_holdout_dqn_v2_policy_evaluation.csv). The regularized result is in [jc_2025_full_year_to_202602_holdout_dqn_margin_v1_policy_evaluation.csv](/home/ptz/dev/rl/citibikeRL/outputs/tables/jc_2025_full_year_to_202602_holdout_dqn_margin_v1_policy_evaluation.csv).
+The unregularized DQN result is in [jc_2025_full_year_to_202602_holdout_dqn_v2_policy_evaluation.csv](../../outputs/tables/jc_2025_full_year_to_202602_holdout_dqn_v2_policy_evaluation.csv). The regularized result is in [jc_2025_full_year_to_202602_holdout_dqn_margin_v1_policy_evaluation.csv](../../outputs/tables/jc_2025_full_year_to_202602_holdout_dqn_margin_v1_policy_evaluation.csv).
 
 The important detail is that the margin gate improves reward by cutting back gratuitous transfers. It does not improve served trips; in fact, the seed-7 regularized DQN serves slightly fewer trips than the heuristic. It wins because it trades off movement and overflow more effectively in that run.
 
@@ -120,7 +120,7 @@ A three-seed sweep shows that the regularized DQN result is not stable. On the s
 - seed 11: `113.61`
 - seed 19: `116.95`
 
-The baseline and heuristic are unchanged across those runs, and the heuristic remains `122.45`. The sweep artifact is [jc_2025_full_year_to_202602_holdout_dqn_margin_seed_sweep.csv](/home/ptz/dev/rl/citibikeRL/outputs/tables/jc_2025_full_year_to_202602_holdout_dqn_margin_seed_sweep.csv).
+The baseline and heuristic are unchanged across those runs, and the heuristic remains `122.45`. The sweep artifact is [jc_2025_full_year_to_202602_holdout_dqn_margin_seed_sweep.csv](../../outputs/tables/jc_2025_full_year_to_202602_holdout_dqn_margin_seed_sweep.csv).
 
 This changes the conclusion. The seed-7 run is a promising best case, not a robust policy win.
 

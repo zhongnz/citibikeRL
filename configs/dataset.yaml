@@ -1,6 +1,6 @@
 dataset:
   raw_path: data/raw/JC-202602-citibike-tripdata.csv
-  processed_path: data/processed/hourly_flows.csv
+  processed_path: data/processed/jc_202602_hourly_flows.csv
   timezone: America/New_York
   required_columns:
     - started_at

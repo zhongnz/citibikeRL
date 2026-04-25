@@ -150,7 +150,7 @@ def main() -> int:
     print(f"Ran experiment '{args.output_prefix}' with {summary['station_count']} station(s).")
     print(f"Selected stations: {', '.join(summary['selected_station_ids'])}")
     print(
-        "{split} baseline avg reward={baseline:.2f}; heuristic avg reward={heuristic:.2f}; trained avg reward={trained:.2f}".format(
+        "{split} baseline avg reward={baseline:.2f}; heuristic avg reward={heuristic:.2f}; q+fallback avg reward={trained:.2f}".format(
             split=summary["primary_eval_split"],
             baseline=summary["baseline_summary"]["avg_reward"],
             heuristic=summary["heuristic_summary"]["avg_reward"],
@@ -158,7 +158,7 @@ def main() -> int:
         ),
     )
     print(
-        "Saved policy avg reward={saved:.2f}; model written to {model_path}".format(
+        "Saved q+fallback avg reward={saved:.2f}; model written to {model_path}".format(
             saved=summary["saved_policy_summary"]["avg_reward"],
             model_path=summary["outputs"]["model"],
         ),

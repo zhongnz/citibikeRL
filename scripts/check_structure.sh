@@ -22,6 +22,7 @@ required_paths=(
   "configs/evaluation.yaml"
   "scripts/validate_dataset.py"
   "scripts/get_dataset.py"
+  "scripts/get_weather_data.py"
   "scripts/train_q_learning.py"
   "scripts/train_dqn.py"
   "scripts/evaluate_baseline.py"

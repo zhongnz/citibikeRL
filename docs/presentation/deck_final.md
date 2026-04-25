@@ -60,7 +60,9 @@
   train through January 2026, test on February 2026
 - No-op baseline: `109.33`
 - Heuristic baseline: `122.45`
-- Weather-aware tabular Q: `122.21`
+- Q table with heuristic fallback: `122.21`
+- The Q-table is almost entirely fallback on this holdout:
+  `23.96` fallback actions per day
 
 ![](assets/jc_2025_full_year_to_202602_holdout_weather_v1_policy_comparison.png){ width=90% }
 

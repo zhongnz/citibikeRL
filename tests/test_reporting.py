@@ -25,7 +25,13 @@ def test_plot_generation_writes_png_files(tmp_path: Path) -> None:
     pd.DataFrame(
         [
             {"policy": "baseline_no_op", "total_reward": -2.0, "served_trips": 1.0, "unmet_demand": 2.0, "moved_bikes": 0.0},
-            {"policy": "saved_q_policy", "total_reward": 3.0, "served_trips": 4.0, "unmet_demand": 0.0, "moved_bikes": 2.0},
+            {
+                "policy": "saved_q_policy_with_heuristic_fallback",
+                "total_reward": 3.0,
+                "served_trips": 4.0,
+                "unmet_demand": 0.0,
+                "moved_bikes": 2.0,
+            },
         ],
     ).to_csv(evaluation_csv, index=False)
 

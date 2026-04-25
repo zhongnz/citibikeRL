@@ -44,8 +44,9 @@ By default this now trains on the earliest `train_fraction` share of days and ev
 You can also pass `--test-start-day YYYY-MM-DD` for an explicit month-boundary holdout.
 The learned Q-table now uses a compact forecast-aware state derived from the training split's demand profile, U.S. federal holiday flags, and optional NOAA daily weather context via `--weather-input`.
 It falls back to the encoded heuristic action on unseen states.
-The learned policy can also require a minimum historical visit count before trusting the Q-table; the default config now uses a conservative `min_state_visit_count`.
-The evaluation CSV includes `baseline_no_op`, `heuristic_demand_profile`, and `trained_q_policy`.
+The learned policy can also require a minimum historical visit count before trusting the Q-table; evaluation rows include `fallback_actions` and `trusted_q_actions` so fallback-heavy runs are visible.
+The default config matches the final tabular report run: 10,000 Q-learning episodes with `min_state_visit_count: 1`.
+The evaluation CSV includes `baseline_no_op`, `heuristic_demand_profile`, and `q_policy_with_heuristic_fallback`.
 
 Use `make train-dqn INPUT=<processed_csv_or_csvs> MODEL=<model_json> TRAINING_METRICS=<training_csv> EVAL_METRICS=<evaluation_csv>` to train a dueling Double DQN-style agent implemented in NumPy.
 This path uses dense forecast, calendar, holiday, and optional weather features instead of a tabular state dictionary.

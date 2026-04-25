@@ -7,7 +7,9 @@ import argparse
 import json
 from datetime import datetime, UTC
 from pathlib import Path
+from urllib.parse import urlparse
 from urllib.request import urlretrieve
+import zipfile
 
 
 def parse_args() -> argparse.Namespace:
@@ -23,8 +25,8 @@ def main() -> int:
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     print(f"Downloading dataset from: {args.url}")
-    urlretrieve(args.url, output_path)
-    print(f"Saved dataset to: {output_path}")
+    saved_path = download_dataset(args.url, output_path)
+    print(f"Saved dataset to: {saved_path}")
 
     meta = {
         "url": args.url,
@@ -49,6 +51,44 @@ def main() -> int:
     print(f"Wrote metadata sidecar: {sidecar_metadata_path}")
     print(f"Updated metadata index: {metadata_path}")
     return 0
+
+
+def download_dataset(url: str, output_path: Path) -> Path:
+    """Download a source file, extracting ZIP-backed CSVs when requested."""
+    if _url_path(url).lower().endswith(".zip") and output_path.suffix.lower() != ".zip":
+        archive_path = output_path.with_suffix(output_path.suffix + ".download")
+        urlretrieve(url, archive_path)
+        try:
+            if zipfile.is_zipfile(archive_path):
+                extract_first_csv(archive_path, output_path)
+            else:
+                archive_path.replace(output_path)
+        finally:
+            if archive_path.exists():
+                archive_path.unlink()
+        return output_path
+
+    urlretrieve(url, output_path)
+    return output_path
+
+
+def extract_first_csv(archive_path: Path, output_path: Path) -> None:
+    """Extract the first CSV member from a ZIP archive."""
+    with zipfile.ZipFile(archive_path) as archive:
+        csv_members = [
+            name
+            for name in archive.namelist()
+            if name.lower().endswith(".csv") and not name.endswith("/")
+        ]
+        if not csv_members:
+            raise ValueError(f"Downloaded ZIP archive does not contain a CSV file: {archive_path}")
+
+        with archive.open(csv_members[0], "r") as source, output_path.open("wb") as destination:
+            destination.write(source.read())
+
+
+def _url_path(url: str) -> str:
+    return urlparse(url).path or url
 
 
 if __name__ == "__main__":

@@ -78,6 +78,36 @@ def test_dqn_beats_no_op_on_simple_rebalancing_problem() -> None:
     assert trained_metrics[0]["unmet_demand"] == 0.0
 
 
+def test_dqn_policy_move_action_margin_falls_back_to_no_op() -> None:
+    dataset = build_simple_dataset()
+    env_config = build_simple_env_config()
+    training_config = build_simple_training_config()
+    result = train_dqn(dataset, env_config, training_config)
+    state_encoder = build_dense_state_encoder(
+        demand_profile=result.demand_profile,
+        station_capacity=env_config.station_capacity,
+    )
+
+    aggressive_policy = DQNPolicy(
+        result.network_state,
+        state_encoder,
+        dueling=training_config.dueling,
+        move_action_margin=0.0,
+    )
+    gated_policy = DQNPolicy(
+        result.network_state,
+        state_encoder,
+        dueling=training_config.dueling,
+        move_action_margin=1e9,
+    )
+
+    aggressive_metrics = evaluate_dqn_policy(dataset, env_config, aggressive_policy)
+    gated_metrics = evaluate_dqn_policy(dataset, env_config, gated_policy)
+
+    assert aggressive_metrics[0]["moved_bikes"] >= 1
+    assert gated_metrics[0]["moved_bikes"] == 0
+
+
 def test_save_and_load_dqn_model_round_trip(tmp_path: Path) -> None:
     dataset = build_simple_dataset()
     env_config = build_simple_env_config()

@@ -65,18 +65,20 @@ make build-check
 ## Dataset-ready commands
 
 ```bash
-python scripts/get_dataset.py --url <DATASET_URL> --output data/raw/JC-202602-citibike-tripdata.csv
+python scripts/get_dataset.py \
+  --url https://tripdata.s3.amazonaws.com/JC-202602-citibike-tripdata.csv.zip \
+  --output data/raw/JC-202602-citibike-tripdata.csv
 python scripts/get_weather_data.py \
   --station USW00014734 \
   --start-date 2025-01-01 \
   --end-date 2026-02-28 \
   --output data/external/noaa_daily_usw00014734_20250101_20260228.csv
 make dataset-validate INPUT=data/raw/JC-202602-citibike-tripdata.csv
-make preprocess-data INPUT=data/raw/JC-202602-citibike-tripdata.csv OUTPUT=data/processed/hourly_flows.csv
+make preprocess-data INPUT=data/raw/JC-202602-citibike-tripdata.csv OUTPUT=data/processed/jc_202602_hourly_flows.csv
 ```
 
 These commands now provide a minimal end-to-end data path: download → schema validate → preprocess hourly flows.
-`get_dataset.py` now writes a per-file metadata sidecar and updates `data/raw/_dataset_metadata.json` so multiple monthly downloads keep their provenance.
+`get_dataset.py` extracts Citi Bike ZIP downloads when the requested output is a `.csv`, writes a per-file metadata sidecar, and updates `data/raw/_dataset_metadata.json` so multiple monthly downloads keep their provenance.
 `get_weather_data.py` downloads normalized NOAA daily summaries that can be passed into experiment commands with `--weather-input`.
 `configs/dataset.yaml` is now the authoritative source for raw-dataset required columns and preprocessing timezone.
 
@@ -85,30 +87,30 @@ These commands now provide a minimal end-to-end data path: download → schema v
 ## Training and evaluation commands
 
 ```bash
-make evaluate-baseline INPUT=data/processed/hourly_flows.csv OUTPUT=outputs/tables/baseline_metrics.csv
+make evaluate-baseline INPUT=data/processed/jc_202602_hourly_flows.csv OUTPUT=outputs/tables/baseline_metrics.csv
 make train-q-learning \
-  INPUT=data/processed/hourly_flows.csv \
+  INPUT=data/processed/jc_202602_hourly_flows.csv \
   MODEL=outputs/models/q_learning_model.json \
   TRAINING_METRICS=outputs/tables/training_metrics.csv \
   EVAL_METRICS=outputs/tables/policy_evaluation.csv
 make train-dqn \
-  INPUT=data/processed/hourly_flows.csv \
+  INPUT=data/processed/jc_202602_hourly_flows.csv \
   MODEL=outputs/models/dqn_model.json \
   TRAINING_METRICS=outputs/tables/dqn_training_metrics.csv \
   EVAL_METRICS=outputs/tables/dqn_policy_evaluation.csv
 make evaluate-saved-policy \
-  INPUT=data/processed/hourly_flows.csv \
+  INPUT=data/processed/jc_202602_hourly_flows.csv \
   MODEL=outputs/models/q_learning_model.json \
   OUTPUT=outputs/tables/saved_policy_evaluation.csv
 make evaluate-saved-dqn \
-  INPUT=data/processed/hourly_flows.csv \
+  INPUT=data/processed/jc_202602_hourly_flows.csv \
   MODEL=outputs/models/dqn_model.json \
   OUTPUT=outputs/tables/saved_dqn_policy_evaluation.csv
 make run-experiment \
-  INPUT=data/processed/hourly_flows.csv \
+  INPUT=data/processed/jc_202602_hourly_flows.csv \
   PREFIX=baseline_v1
 make run-experiment \
-  INPUT=data/processed/jc_202601_hourly_flows.csv,data/processed/hourly_flows.csv \
+  INPUT=data/processed/jc_202601_hourly_flows.csv,data/processed/jc_202602_hourly_flows.csv \
   PREFIX=month_holdout_v1
 PYTHONPATH=src python scripts/run_experiment.py \
   --input data/processed/jc_202501_hourly_flows.csv,data/processed/jc_202502_hourly_flows.csv \
@@ -131,6 +133,7 @@ What the first implementation supports:
 - also supports a NumPy dueling Double DQN path using dense forecast, calendar, holiday, and optional weather features,
 - derives U.S. federal holiday flags for every demand day and can merge NOAA daily weather context via `--weather-input`,
 - falls back to the encoded heuristic action when the Q-table encounters an unseen or low-visit forecast state,
+- records `fallback_actions` and `trusted_q_actions` in tabular policy evaluation metrics so fallback-heavy runs are visible,
 - uses a chronological train/test split across available days by default,
 - also supports an explicit `test_start_day` cutoff for month-holdout evaluation,
 - saves training metrics, evaluation metrics, and a serialized Q-table,
@@ -141,6 +144,7 @@ What the first implementation supports:
 Default runtime settings live in:
 - `configs/environment.yaml`
 - `configs/training.yaml`
+- `configs/dqn_training.yaml`
 - `configs/evaluation.yaml`
 
 ---

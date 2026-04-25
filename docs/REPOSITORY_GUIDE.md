@@ -9,7 +9,7 @@ The layout follows a simple principle:
 - **Inputs** (`data/raw`, references) are separated from
 - **Work-in-progress analysis** (`notebooks`, `docs/notes`) and
 - **Outputs** (`outputs/figures`, `outputs/tables`, `outputs/models`), while
-- keeping a dedicated place for **future production code** (`src/citibikerl`) and **future reproducible commands** (`scripts`).
+- keeping implementation code in `src/citibikerl` and reproducible commands in `scripts`.
 
 This separation prevents common project issues:
 - mixing source files with generated files,
@@ -54,9 +54,9 @@ Before final submission:
 
 ## E. Scope boundaries for this setup stage
 
-At the current stage, this repo intentionally **does not** include model code. The goal is to establish:
+At the current stage, this repo includes model-free rebalancing code, experiment scripts, tests, and final report artifacts. The goal is to preserve:
 
 - clear directory boundaries,
 - clean documentation flow,
 - low-friction team collaboration,
-- smooth migration path to implementation.
+- reproducible training, evaluation, and reporting commands.

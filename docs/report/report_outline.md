@@ -58,7 +58,7 @@
 - Early February split:
   calendar features help tabular Q-learning, but the heuristic remains much stronger.
 - Full-year seasonal holdout:
-  weather-aware tabular Q-learning approaches the heuristic but does not beat it.
+  the Q table with heuristic fallback approaches the heuristic, but the fallback counters show the strict holdout is mostly unseen by the Q-table.
 - DQN:
   unregularized DQN over-moves bikes; move-margin regularization improves the best run.
 - Robustness:

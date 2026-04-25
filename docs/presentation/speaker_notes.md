@@ -29,6 +29,7 @@
 - This is the core result slide.
 - State directly:
   the heuristic is the strongest robust policy on the future-month holdout.
+- Note that the tabular Q-table line is mostly heuristic fallback on this strict holdout, so it should not be presented as a standalone learned-policy win.
 
 ## Slide 8 — DQN Result and Caveat
 - Explain the failure mode:

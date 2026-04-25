@@ -45,7 +45,6 @@ from .q_learning import (
     summarize_metrics,
     train_q_learning,
 )
-from .reporting import plot_policy_comparison, plot_training_rewards
 
 __all__ = [
     "DailyContext",
@@ -100,6 +99,4 @@ __all__ = [
     "evaluate_policy",
     "summarize_metrics",
     "train_q_learning",
-    "plot_policy_comparison",
-    "plot_training_rewards",
 ]

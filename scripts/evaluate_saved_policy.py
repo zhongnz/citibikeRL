@@ -94,7 +94,7 @@ def main() -> int:
             fallback_policy=forecast_fallback_policy,
         ),
         bucket_size=saved_model.training_config.bucket_size,
-        policy_name="saved_q_policy",
+        policy_name="saved_q_policy_with_heuristic_fallback",
         state_encoder=q_state_encoder,
     )
     metrics_frames.append(pd.DataFrame(trained_metrics))

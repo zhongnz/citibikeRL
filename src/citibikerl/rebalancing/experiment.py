@@ -21,7 +21,6 @@ from .q_learning import (
     summarize_metrics,
     train_q_learning,
 )
-from .reporting import plot_policy_comparison, plot_training_rewards
 from .context import summarize_weather_context
 
 
@@ -137,7 +136,7 @@ def run_experiment(
                     fallback_policy=forecast_fallback_policy,
                 ),
                 bucket_size=training_config.bucket_size,
-                policy_name="trained_q_policy",
+                policy_name="q_policy_with_heuristic_fallback",
                 state_encoder=q_state_encoder,
             ),
             split_name,
@@ -151,6 +150,7 @@ def run_experiment(
             "baseline_summary": summarize_metrics(baseline_metrics),
             "heuristic_summary": summarize_metrics(heuristic_metrics),
             "trained_summary": summarize_metrics(trained_metrics),
+            "q_policy_with_heuristic_fallback_summary": summarize_metrics(trained_metrics),
         }
 
     evaluation_frame = pd.concat(evaluation_frames, ignore_index=True)
@@ -204,7 +204,7 @@ def run_experiment(
                     fallback_policy=saved_forecast_fallback_policy,
                 ),
                 bucket_size=saved_model.training_config.bucket_size,
-                policy_name="saved_q_policy",
+                policy_name="saved_q_policy_with_heuristic_fallback",
                 state_encoder=saved_q_state_encoder,
             ),
             split_name,
@@ -213,9 +213,12 @@ def run_experiment(
             [pd.DataFrame(baseline_metrics), pd.DataFrame(heuristic_metrics), pd.DataFrame(saved_metrics)],
         )
         evaluation_summaries[split_name]["saved_policy_summary"] = summarize_metrics(saved_metrics)
+        evaluation_summaries[split_name]["saved_q_policy_with_heuristic_fallback_summary"] = summarize_metrics(saved_metrics)
 
     saved_frame = pd.concat(saved_frames, ignore_index=True)
     saved_frame.to_csv(output_paths.saved_policy_metrics_path, index=False)
+
+    from .reporting import plot_policy_comparison, plot_training_rewards
 
     plot_training_rewards(output_paths.training_metrics_path, output_paths.reward_plot_path)
     plot_policy_comparison(output_paths.evaluation_metrics_path, output_paths.comparison_plot_path)
@@ -241,7 +244,11 @@ def run_experiment(
         "baseline_summary": primary_summary["baseline_summary"],
         "heuristic_summary": primary_summary["heuristic_summary"],
         "trained_summary": primary_summary["trained_summary"],
+        "q_policy_with_heuristic_fallback_summary": primary_summary["q_policy_with_heuristic_fallback_summary"],
         "saved_policy_summary": primary_summary["saved_policy_summary"],
+        "saved_q_policy_with_heuristic_fallback_summary": primary_summary[
+            "saved_q_policy_with_heuristic_fallback_summary"
+        ],
         "evaluation_summaries": evaluation_summaries,
         "outputs": {
             "model": str(output_paths.model_path),

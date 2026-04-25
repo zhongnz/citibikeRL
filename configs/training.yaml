@@ -3,7 +3,7 @@ training:
   station_ids: []
   train_fraction: 0.75
   test_start_day:
-  episodes: 300
+  episodes: 10000
   alpha: 0.2
   gamma: 0.95
   epsilon: 0.35
@@ -12,5 +12,5 @@ training:
   bucket_size: 2
   forecast_bucket_size: 2
   heuristic_exploration_bias: 0.0
-  min_state_visit_count: 200
+  min_state_visit_count: 1
   seed: 7

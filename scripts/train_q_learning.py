@@ -224,7 +224,7 @@ def main() -> int:
                     fallback_policy=forecast_fallback_policy,
                 ),
                 bucket_size=training_config.bucket_size,
-                policy_name="trained_q_policy",
+                policy_name="q_policy_with_heuristic_fallback",
                 state_encoder=q_state_encoder,
             )
         ]
@@ -251,7 +251,7 @@ def main() -> int:
     )
     print(f"Selected stations: {', '.join(dataset.station_ids)}")
     print(
-        "{split} baseline avg reward={avg_reward:.2f}; heuristic avg reward={heuristic_reward:.2f}; trained avg reward={trained_reward:.2f}".format(
+        "{split} baseline avg reward={avg_reward:.2f}; heuristic avg reward={heuristic_reward:.2f}; q+fallback avg reward={trained_reward:.2f}".format(
             split=primary_split,
             avg_reward=primary_summary["baseline_reward"],
             heuristic_reward=primary_summary["heuristic_reward"],
@@ -259,7 +259,7 @@ def main() -> int:
         ),
     )
     print(
-        "{split} baseline avg unmet={avg_unmet_demand:.2f}; heuristic avg unmet={heuristic_unmet:.2f}; trained avg unmet={trained_unmet:.2f}".format(
+        "{split} baseline avg unmet={avg_unmet_demand:.2f}; heuristic avg unmet={heuristic_unmet:.2f}; q+fallback avg unmet={trained_unmet:.2f}".format(
             split=primary_split,
             avg_unmet_demand=primary_summary["baseline_unmet"],
             heuristic_unmet=primary_summary["heuristic_unmet"],

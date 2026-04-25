@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-03-26T19:15:52.470837+00:00",
+  "generated_at_utc": "2026-04-25T05:04:00.471147+00:00",
   "input_path": "data/processed/jc_202501_hourly_flows.csv,data/processed/jc_202502_hourly_flows.csv,data/processed/jc_202503_hourly_flows.csv,data/processed/jc_202504_hourly_flows.csv,data/processed/jc_202505_hourly_flows.csv,data/processed/jc_202506_hourly_flows.csv,data/processed/jc_202507_hourly_flows.csv,data/processed/jc_202508_hourly_flows.csv,data/processed/jc_202509_hourly_flows.csv,data/processed/jc_202510_hourly_flows.csv,data/processed/jc_202511_hourly_flows.csv,data/processed/jc_202512_hourly_flows.csv,data/processed/jc_202601_hourly_flows.csv,data/processed/jc_202602_hourly_flows.csv",
   "weather_input": "data/external/noaa_daily_usw00014734_20250101_20260228.csv",
   "weather_context": {
@@ -21,7 +21,7 @@
   "test_episode_count": 27,
   "primary_eval_split": "test",
   "split_strategy": "explicit_day_boundary",
-  "git_head": "adf792d74065967d3979f84ed8b319c74a2724f4",
+  "git_head": "d51bc5ea18c0640d76761f49bbdbf4a800288da8",
   "environment": {
     "station_capacity": 20,
     "initial_inventory": 10,
@@ -51,28 +51,54 @@
     "avg_served_trips": 148.7037037037037,
     "avg_unmet_demand": 12.481481481481481,
     "avg_moved_bikes": 0.0,
-    "avg_overflow_bikes": 28.814814814814813
+    "avg_overflow_bikes": 28.814814814814813,
+    "avg_fallback_actions": 0.0,
+    "avg_trusted_q_actions": 0.0
   },
   "heuristic_summary": {
     "avg_reward": 122.45185185185184,
     "avg_served_trips": 153.11111111111111,
     "avg_unmet_demand": 8.074074074074074,
     "avg_moved_bikes": 9.11111111111111,
-    "avg_overflow_bikes": 28.11111111111111
+    "avg_overflow_bikes": 28.11111111111111,
+    "avg_fallback_actions": 0.0,
+    "avg_trusted_q_actions": 0.0
   },
   "trained_summary": {
     "avg_reward": 122.20555555555556,
     "avg_served_trips": 153.03703703703704,
     "avg_unmet_demand": 8.148148148148149,
     "avg_moved_bikes": 9.222222222222221,
-    "avg_overflow_bikes": 28.14814814814815
+    "avg_overflow_bikes": 28.14814814814815,
+    "avg_fallback_actions": 23.962962962962962,
+    "avg_trusted_q_actions": 0.037037037037037035
+  },
+  "q_policy_with_heuristic_fallback_summary": {
+    "avg_reward": 122.20555555555556,
+    "avg_served_trips": 153.03703703703704,
+    "avg_unmet_demand": 8.148148148148149,
+    "avg_moved_bikes": 9.222222222222221,
+    "avg_overflow_bikes": 28.14814814814815,
+    "avg_fallback_actions": 23.962962962962962,
+    "avg_trusted_q_actions": 0.037037037037037035
   },
   "saved_policy_summary": {
     "avg_reward": 122.20555555555556,
     "avg_served_trips": 153.03703703703704,
     "avg_unmet_demand": 8.148148148148149,
     "avg_moved_bikes": 9.222222222222221,
-    "avg_overflow_bikes": 28.14814814814815
+    "avg_overflow_bikes": 28.14814814814815,
+    "avg_fallback_actions": 23.962962962962962,
+    "avg_trusted_q_actions": 0.037037037037037035
+  },
+  "saved_q_policy_with_heuristic_fallback_summary": {
+    "avg_reward": 122.20555555555556,
+    "avg_served_trips": 153.03703703703704,
+    "avg_unmet_demand": 8.148148148148149,
+    "avg_moved_bikes": 9.222222222222221,
+    "avg_overflow_bikes": 28.14814814814815,
+    "avg_fallback_actions": 23.962962962962962,
+    "avg_trusted_q_actions": 0.037037037037037035
   },
   "evaluation_summaries": {
     "train": {
@@ -480,28 +506,54 @@
         "avg_served_trips": 285.7929292929293,
         "avg_unmet_demand": 72.63131313131314,
         "avg_moved_bikes": 0.0,
-        "avg_overflow_bikes": 96.17171717171718
+        "avg_overflow_bikes": 96.17171717171718,
+        "avg_fallback_actions": 0.0,
+        "avg_trusted_q_actions": 0.0
       },
       "heuristic_summary": {
         "avg_reward": 119.7435606060606,
         "avg_served_trips": 294.5050505050505,
         "avg_unmet_demand": 63.91919191919192,
         "avg_moved_bikes": 13.007575757575758,
-        "avg_overflow_bikes": 92.54545454545455
+        "avg_overflow_bikes": 92.54545454545455,
+        "avg_fallback_actions": 0.0,
+        "avg_trusted_q_actions": 0.0
       },
       "trained_summary": {
         "avg_reward": 105.4598484848485,
         "avg_served_trips": 289.89646464646466,
         "avg_unmet_demand": 68.52777777777777,
         "avg_moved_bikes": 14.515151515151516,
-        "avg_overflow_bikes": 93.31060606060606
+        "avg_overflow_bikes": 93.31060606060606,
+        "avg_fallback_actions": 0.17676767676767677,
+        "avg_trusted_q_actions": 23.82323232323232
+      },
+      "q_policy_with_heuristic_fallback_summary": {
+        "avg_reward": 105.4598484848485,
+        "avg_served_trips": 289.89646464646466,
+        "avg_unmet_demand": 68.52777777777777,
+        "avg_moved_bikes": 14.515151515151516,
+        "avg_overflow_bikes": 93.31060606060606,
+        "avg_fallback_actions": 0.17676767676767677,
+        "avg_trusted_q_actions": 23.82323232323232
       },
       "saved_policy_summary": {
         "avg_reward": 105.4598484848485,
         "avg_served_trips": 289.89646464646466,
         "avg_unmet_demand": 68.52777777777777,
         "avg_moved_bikes": 14.515151515151516,
-        "avg_overflow_bikes": 93.31060606060606
+        "avg_overflow_bikes": 93.31060606060606,
+        "avg_fallback_actions": 0.17676767676767677,
+        "avg_trusted_q_actions": 23.82323232323232
+      },
+      "saved_q_policy_with_heuristic_fallback_summary": {
+        "avg_reward": 105.4598484848485,
+        "avg_served_trips": 289.89646464646466,
+        "avg_unmet_demand": 68.52777777777777,
+        "avg_moved_bikes": 14.515151515151516,
+        "avg_overflow_bikes": 93.31060606060606,
+        "avg_fallback_actions": 0.17676767676767677,
+        "avg_trusted_q_actions": 23.82323232323232
       }
     },
     "test": {
@@ -540,28 +592,54 @@
         "avg_served_trips": 148.7037037037037,
         "avg_unmet_demand": 12.481481481481481,
         "avg_moved_bikes": 0.0,
-        "avg_overflow_bikes": 28.814814814814813
+        "avg_overflow_bikes": 28.814814814814813,
+        "avg_fallback_actions": 0.0,
+        "avg_trusted_q_actions": 0.0
       },
       "heuristic_summary": {
         "avg_reward": 122.45185185185184,
         "avg_served_trips": 153.11111111111111,
         "avg_unmet_demand": 8.074074074074074,
         "avg_moved_bikes": 9.11111111111111,
-        "avg_overflow_bikes": 28.11111111111111
+        "avg_overflow_bikes": 28.11111111111111,
+        "avg_fallback_actions": 0.0,
+        "avg_trusted_q_actions": 0.0
       },
       "trained_summary": {
         "avg_reward": 122.20555555555556,
         "avg_served_trips": 153.03703703703704,
         "avg_unmet_demand": 8.148148148148149,
         "avg_moved_bikes": 9.222222222222221,
-        "avg_overflow_bikes": 28.14814814814815
+        "avg_overflow_bikes": 28.14814814814815,
+        "avg_fallback_actions": 23.962962962962962,
+        "avg_trusted_q_actions": 0.037037037037037035
+      },
+      "q_policy_with_heuristic_fallback_summary": {
+        "avg_reward": 122.20555555555556,
+        "avg_served_trips": 153.03703703703704,
+        "avg_unmet_demand": 8.148148148148149,
+        "avg_moved_bikes": 9.222222222222221,
+        "avg_overflow_bikes": 28.14814814814815,
+        "avg_fallback_actions": 23.962962962962962,
+        "avg_trusted_q_actions": 0.037037037037037035
       },
       "saved_policy_summary": {
         "avg_reward": 122.20555555555556,
         "avg_served_trips": 153.03703703703704,
         "avg_unmet_demand": 8.148148148148149,
         "avg_moved_bikes": 9.222222222222221,
-        "avg_overflow_bikes": 28.14814814814815
+        "avg_overflow_bikes": 28.14814814814815,
+        "avg_fallback_actions": 23.962962962962962,
+        "avg_trusted_q_actions": 0.037037037037037035
+      },
+      "saved_q_policy_with_heuristic_fallback_summary": {
+        "avg_reward": 122.20555555555556,
+        "avg_served_trips": 153.03703703703704,
+        "avg_unmet_demand": 8.148148148148149,
+        "avg_moved_bikes": 9.222222222222221,
+        "avg_overflow_bikes": 28.14814814814815,
+        "avg_fallback_actions": 23.962962962962962,
+        "avg_trusted_q_actions": 0.037037037037037035
       }
     }
   },

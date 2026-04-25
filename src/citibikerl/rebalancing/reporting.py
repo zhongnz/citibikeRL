@@ -2,14 +2,21 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
+import tempfile
 
-import matplotlib
+if "MPLCONFIGDIR" not in os.environ:
+    matplotlib_cache_dir = Path(tempfile.gettempdir()) / "citibikerl-matplotlib"
+    matplotlib_cache_dir.mkdir(parents=True, exist_ok=True)
+    os.environ["MPLCONFIGDIR"] = str(matplotlib_cache_dir)
+
+import matplotlib  # noqa: E402
 
 matplotlib.use("Agg")
 
-import matplotlib.pyplot as plt
-import pandas as pd
+import matplotlib.pyplot as plt  # noqa: E402
+import pandas as pd  # noqa: E402
 
 
 def plot_training_rewards(training_metrics_path: str | Path, output_path: str | Path) -> None:
