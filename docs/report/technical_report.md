@@ -326,6 +326,18 @@ At `env.reset(episode_index)`:
 
 This initial inventory makes the first few hours feasible (no immediate stockouts) and gives both directions of action room to operate.
 
+### 4.7 A Note on `station_capacity`
+
+The simulator uses a uniform `station_capacity = 20` for every station. This value is **a modeling choice configured in `configs/environment.yaml`, not a measurement from the data.** The Citi Bike trip CSVs contain no dock-count column; real per-station capacity is published in the GBFS `station_information.json` feed, which this project does not ingest.
+
+In reality, the five selected stations have heterogeneous capacities: JC115 (Grove Street PATH) and HB101 (Hoboken Terminal) are among the busiest stations in the system and carry ~40–60 docks; smaller stations carry ~15–25. The simulator's uniform 20 therefore *under-specifies* the high-activity stations the heuristic and learners actually select. Practical implications:
+
+- The overflow constraint is tighter than reality at the busiest stations, so all policies hit overflow more often than they would in deployment.
+- The heuristic's destination-overflow guard (`I[destination] >= capacity − 3`) fires earlier, sometimes blocking moves that would be feasible against a 50-dock station.
+- Initial inventory of 10 corresponds to "half full" at capacity 20; under a real 50-dock station, the same starting count is "20% full," changing the early-hour stockout dynamics.
+
+Conclusions on policy *ordering* are robust to this choice (relative comparisons hold under any uniform capacity), but absolute reward magnitudes and the precise overflow numbers in §11 reflect the 20-dock simulator, not deployment.
+
 ---
 
 ## 5. State Encoders
@@ -1008,6 +1020,30 @@ From the original v1 (unregularized) vs. v2 (margin = 3.0) DQN comparison in `re
 
 The margin gate cuts gratuitous moves (44.63 → 20.07) while leaving served trips ≈ unchanged, raising reward by reducing `move_penalty_per_bike · moved_bikes` and the resulting overflow. It does *not* improve served trips.
 
+### 11.6 Why the heuristic is so strong
+
+The empirical fact that the demand-profile heuristic (122.45) ties or beats every learner on the strict holdout is not an accident of small-N evaluation. It reflects six structural properties of this MDP, each of which independently shrinks the headroom available to a learner.
+
+**1. Bike-share demand is dominated by `(day_of_week, hour_of_day)`.** The dataset's strongest signal is commuter periodicity: weekday mornings around 08:00 and weekday evenings around 17:00–18:00 are the dominant hours, with weekend demand spread across midday. The demand heatmap in §3.3 shows this directly. Group-by-(dow, hour) means are the most natural non-parametric estimator of that signal, and the heuristic's `DemandProfile` is exactly that estimator. Anything more sophisticated competes with a forecaster that already captures the bulk of the explainable variance.
+
+**2. The reward is myopic.** The reward function pays `+1` per served trip *this hour* and `−2` per unmet trip *this hour*, with a small per-bike movement cost. There is no large multi-step term. With γ=0.95 over a 24-step episode, hour 24 is worth ≈0.30× hour 1, but more importantly, the per-hour optimum aligns with the per-day optimum because the demand profile is itself stable across hours. A one-step look-ahead policy that maximizes next-hour expected balance is therefore close to per-step optimal, and per-step optimal is close to per-episode optimal.
+
+**3. The action space is tiny and well-structured.** 21 discrete actions per hour. The heuristic's rule — "move from highest predicted surplus to highest predicted deficit, gated on feasibility" — is almost certainly the best single action available at most states. Of the 20 non-trivial moves, most are strictly worse (smaller predicted improvement) or infeasible. There is no clever combinatorial action a learner can discover that the heuristic missed: the search space is too small to hide one.
+
+**4. The four feasibility guards are precisely right.** A naive "always move bikes from high-inventory to low-inventory stations" policy would over-move and incur both the per-bike penalty and overflow at the destination. The heuristic's guards eliminate exactly the move types that the reward function punishes:
+
+- Guard 3 prevents a `0.05 × moved` penalty on moves that won't actually displace 3 bikes.
+- Guard 4 prevents `0.5 × overflow` at the destination.
+- Guard 2 prevents speculative moves at structurally balanced stations.
+
+The result is `avg_moved_bikes = 9.11` per episode for the heuristic versus `28.29` for the unregularized DQN seed-mean. The heuristic achieves the same served-trip count with one third the movement, which is exactly what the reward function rewards.
+
+**5. The training data is rich enough for stable forecasts.** With 396 training days, each `(dow, hour)` cell has roughly 57 samples (sometimes more, sometimes fewer due to seasonal effects). That is enough for the per-cell mean to be a low-variance estimator. Test-time `(dow, hour)` cells are not novel — Wednesdays at 08:00 occur in February too — so the forecast generalizes essentially perfectly across the holdout.
+
+**6. The censored-demand approximation actually helps the heuristic.** The simulator's "demand" comes from completed trips, not attempted-but-unfulfilled rentals (Citi Bike does not publish the latter). Historical departures are therefore bounded above by historical bike supply — they reflect the demand pattern that the real system *was able to serve*. The heuristic, also trained on this same distribution, matches the simulator's demand patterns by construction. A learner would need to discover structure beyond this matched distribution to outperform, but no such structure is available in the data.
+
+These six points combine into a single structural claim: **the heuristic is a near-optimal myopic policy on an MDP whose dominant structure is myopic.** RL's traditional advantages (multi-step credit assignment, learning hidden state, adapting online) are precisely the advantages this MDP does not reward strongly. The natural escape route is therefore not "more RL" but a different problem framing — a residual learner that takes the heuristic as prior and adds a learned correction (§14, item 1), or a richer environment (more stations, route-level travel costs, terminal-state reward) where multi-step structure starts to matter.
+
 ---
 
 ## 12. Diagnosis
@@ -1073,6 +1109,7 @@ In all three cases, **adding more training cannot fix the bottleneck**. The diag
 
 - **Five stations.** The MDP intentionally limits scope. Real Citi Bike systems have hundreds of stations and route-level travel costs that are absent here.
 - **Pairwise fixed-size transfers.** Real operators use trucks with capacity > 1 and serial routes; the action set here is independent single-edge moves of 3 bikes.
+- **Uniform `station_capacity = 20` is a modeling assumption, not a measurement.** The Citi Bike trip data does not include dock counts. Real Jersey City stations are heterogeneous — JC115 and HB101 carry roughly 40–60 docks each, smaller ones ~15–25. The simulator's uniform 20 is tighter than the deployment reality at the busiest stations and changes the overflow / move trade-off. Conclusions on policy ordering are robust to this choice; absolute reward magnitudes and per-station overflow numbers are simulator-specific. Ingesting the GBFS `station_information.json` feed would correct this. See §4.7 for the operational consequences.
 - **Initial inventory is fixed at 10 per station.** Real operations begin each day at a state determined by the prior day's terminal state; this episode model resets daily.
 - **Within-hour dynamics are sequential, not interleaved.** The model applies the action, then the entire hour's demand. Reality is interleaved arrivals and departures; for hourly aggregation this is a reasonable approximation but it does throw away within-hour pickup/dropoff orderings.
 - **Overflow lost.** Bikes in excess of capacity vanish from the system within an episode. A real operator's truck might pick them up.
