@@ -14,6 +14,40 @@ This project studies a deliberately compact instance of that MDP — five high-a
 
 The short answer (full evidence in §10–§12): **no, not reliably**. The heuristic captures most of the available signal; tabular Q-learning either reduces to the heuristic via fallback or degrades when forced to act on its own values; and a dueling Double DQN gives mean reward 117.25 ± 4.18 across 8 seeds versus heuristic 122.45, with 1/8 seeds beating the heuristic.
 
+### 1.1 System overview at a glance
+
+```mermaid
+flowchart LR
+    subgraph DATA["Data sources"]
+        A1[Citi Bike S3<br/>14 monthly ZIPs<br/>Jan 2025 – Feb 2026]
+        A2[NOAA NCEI API<br/>USW00014734<br/>daily weather]
+        A3[US Federal<br/>Holiday Calendar]
+    end
+    subgraph PIPE["Preprocessing"]
+        B1[Schema<br/>validation]
+        B2[Hourly OD-flow<br/>aggregation]
+        B3[Demand-tensor<br/>construction<br/>423 days × 24 h × 5 stations]
+    end
+    subgraph MDP["MDP environment"]
+        C1[State<br/>inventory + calendar<br/>+ weather]
+        C2[Action<br/>21 discrete moves]
+        C3[Reward<br/>+served − unmet<br/>− moves − overflow]
+    end
+    subgraph POL["Policies"]
+        D1[NoOp baseline]
+        D2[Demand-profile<br/>heuristic]
+        D3[Tabular Q<br/>v1..v4]
+        D4[NumPy DQN<br/>dueling + double]
+    end
+    subgraph EVAL["Evaluation"]
+        E1[Train: 396 days<br/>Test: 27 days Feb-2026]
+        E2[Per-episode metrics<br/>+ summary JSON]
+    end
+    DATA --> PIPE --> MDP
+    MDP --> POL
+    POL --> EVAL
+```
+
 ---
 
 ## 2. Repository Layout
@@ -64,6 +98,23 @@ The package is installed editable: `pyproject.toml` declares `package-dir = {"" 
 ---
 
 ## 3. Dataset
+
+### 3.0 End-to-end data pipeline
+
+```mermaid
+flowchart LR
+    A[("https://tripdata.<br/>s3.amazonaws.com")]:::ext -->|get_dataset.py| B["data/raw/<br/>JC-YYYYMM.zip + extracted CSV<br/>+ per-file metadata JSON"]
+    W[("NOAA NCEI<br/>daily-summaries API")]:::ext -->|get_weather_data.py| X["data/external/<br/>noaa_daily_*.csv + metadata"]
+    B -->|validate_dataset.py| C{"required columns<br/>present?"}
+    C -->|no| Z[reject]
+    C -->|yes| D[preprocess_data.py]
+    D -->|"groupby (hour, src, dst).sum()"| F["data/processed/<br/>jc_YYYYMM_hourly_flows.csv"]
+    F -->|load_demand_dataset| G["DemandDataset<br/>departures: D × 24 × N<br/>arrivals:   D × 24 × N"]
+    X -->|build_daily_context| H["DailyContext<br/>weather + holiday + calendar"]
+    H --> G
+    G --> I[RebalancingEnv]
+    classDef ext fill:#fef3c7,stroke:#92400e,color:#92400e;
+```
 
 ### 3.1 Trip Demand: Jersey City Citi Bike
 
@@ -128,6 +179,14 @@ A subtle integrity check lives in `_extract_expected_year_month` (`src/citibiker
 
 For 14 months × ~30 days = **423 daily episodes** at the chosen 5-station subset.
 
+![Five selected stations by total departures and arrivals](../../outputs/figures/technical_report/selected_stations.png)
+
+The five stations were chosen by total `(departures + arrivals)` across the full study window. JC115 is the dominant origin/destination by a substantial margin; the remainder are roughly balanced. Both bars use the same trip definition described in §3.1 — a single trip contributes to its origin's `total_departures` and its destination's `total_arrivals`, so a trip whose endpoints are both in the selected set is counted once on each side.
+
+![Mean hourly demand by day-of-week and hour-of-day](../../outputs/figures/technical_report/demand_heatmap.png)
+
+The demand profile is dominated by weekday rush hours: morning peak around 08:00 Mon–Fri and evening peak around 17:00–18:00 Mon–Fri, with weekend demand spread across midday. This `(dow, hour)` periodicity is precisely what the demand-profile heuristic exploits (§6.3); it is also why a learner that only adds calendar features beyond `dow` has limited room to add value.
+
 ### 3.4 Daily Calendar and Weather Context
 
 For each episode day, `build_daily_context` (`src/citibikerl/rebalancing/context.py`) constructs a `DailyContext`:
@@ -166,6 +225,25 @@ This is a strict future-month holdout: the test split's calendar features (month
 ## 4. MDP Formulation
 
 The environment is implemented in `src/citibikerl/rebalancing/env.py`.
+
+### 4.0 One step in pictures
+
+```mermaid
+flowchart TD
+    S0["State s_t<br/>(t, dow, weekend, month, holiday,<br/>weather, inventory_1..N)"] -->|"policy"| A["Action a_t<br/>0..20"]
+    A -->|"_apply_action"| M["Move up to 3 bikes<br/>source → destination<br/>(capped by inventory + capacity)"]
+    M --> R1["Read demand for hour t<br/>departures_t, arrivals_t"]
+    R1 --> SV["served = min(inventory, departures)<br/>unmet  = departures − served"]
+    SV --> UI["inventory ← inventory − served + arrivals"]
+    UI --> OV["overflow = max(inventory − capacity, 0)<br/>inventory ← min(inventory, capacity)"]
+    OV --> RW["r_t = +1·served − 2·unmet<br/>− 0.05·moved − 0.5·overflow"]
+    RW --> S1["State s_{t+1}"]
+    S1 -.->|"t += 1"| S0
+```
+
+![Action space layout](../../outputs/figures/technical_report/action_space.png)
+
+For 5 stations the action set has 21 elements: one `no_op` plus 20 directed source-destination pairs. Every move transfers up to 3 bikes from source to destination, subject to source availability and destination capacity. No action ever transfers bikes into or out of the 5-station subset — that flow happens only via observed demand (departures and arrivals to/from non-selected stations).
 
 ### 4.1 Episode and Time
 
@@ -253,6 +331,10 @@ This initial inventory makes the first few hours feasible (no immediate stockout
 ## 5. State Encoders
 
 The full underlying state is high-dimensional. Different policies need different discretizations. The codebase defines five encoders living in `src/citibikerl/rebalancing/q_learning.py`.
+
+![State encoder progression by dimensionality](../../outputs/figures/technical_report/state_encoder_growth.png)
+
+The tabular variants stay at ≤17 dimensions to keep the Q-table cardinality manageable; the DQN's dense encoder (54 dims) leverages function approximation and so does not pay the same cardinality cost. As §11.3 shows, this dimensionality progression is the central tension: more features improve in-distribution fit but reduce test-time coverage of the discrete tabular state.
 
 ### 5.1 Inventory Baseline (`INVENTORY_STATE_REPRESENTATION = "inventory_calendar_v1"`)
 
@@ -347,6 +429,48 @@ Several encoders need a forecast of expected departures/arrivals. `build_demand_
 
 All non-DQN policies implement `Policy.select_action(state, action_count) -> int`. DQN bypasses the discrete state and reads the `Observation` directly.
 
+```mermaid
+classDiagram
+    class Policy {
+        <<interface>>
+        +select_action(state, |A|) int
+    }
+    class NoOpPolicy {
+        +select_action() returns 0
+    }
+    class ForecastHeuristicPolicy {
+        +heuristic_action_position
+        reads embedded heuristic action from state
+    }
+    class DemandProfilePolicy {
+        +demand_profile (7×24×N tensor)
+        +bucket_size
+        +move_amount
+        +station_capacity
+        greedy on E[balance] with feasibility guards
+    }
+    class QTablePolicy {
+        +q_table : dict[state, ndarray]
+        +state_visit_counts
+        +min_visit_count
+        +fallback_policy
+        argmax if trusted; otherwise fallback
+    }
+    class DQNPolicy {
+        +network_state (W,b for 2 hidden + V/A heads)
+        +state_encoder (54-dim dense)
+        +dueling
+        +move_action_margin
+        gated argmax over Q-network output
+    }
+    Policy <|-- NoOpPolicy
+    Policy <|-- ForecastHeuristicPolicy
+    Policy <|-- DemandProfilePolicy
+    Policy <|-- QTablePolicy
+    Policy <|-- DQNPolicy
+    QTablePolicy --> ForecastHeuristicPolicy : fallback when state unseen
+```
+
 ### 6.1 NoOpPolicy (`policies.py:14`)
 
 Always returns 0. Used as the conservative baseline ("do nothing"). Calibrates how much value rebalancing can possibly add.
@@ -357,7 +481,25 @@ Reads the `heuristic_action` integer embedded at position 3 of any forecast-awar
 
 ### 6.3 DemandProfilePolicy (`policies.py:65`)
 
-The strong heuristic. Algorithm (pseudocode):
+The strong heuristic. Decision flow:
+
+```mermaid
+flowchart TD
+    A["Current state<br/>(t, dow, inventory I)"] --> B["E_dep = profile.departures dow,t<br/>E_arr = profile.arrivals dow,t"]
+    B --> C["balance = I + E_arr − E_dep"]
+    C --> D["source = argmax(balance)<br/>destination = argmin(balance)"]
+    D --> G1{"source == destination?"}
+    G1 -->|yes| OUT[no_op]
+    G1 -->|no| G2{"surplus ≤ 0 or<br/>shortage ≤ 0?"}
+    G2 -->|yes| OUT
+    G2 -->|no| G3{"surplus < 3 or<br/>I[source] < 3?"}
+    G3 -->|yes| OUT
+    G3 -->|no| G4{"I[destination] ≥<br/>capacity − 3?"}
+    G4 -->|yes| OUT
+    G4 -->|no| MV["return move<br/>(source → destination)"]
+```
+
+Algorithm (pseudocode):
 
 ```
 At step t with inventory I and (dow, t):
@@ -399,6 +541,21 @@ The two counters are read at evaluation time to compute per-episode `trusted_q_a
 
 ### 6.5 DQNPolicy (`dqn.py:82`)
 
+```mermaid
+flowchart LR
+    O[Observation] -->|build_dense_state_encoder| F["Feature vector φ(s)<br/>54 dims"]
+    F --> H1["W1: 54×64 + b1<br/>ReLU"]
+    H1 --> H2["W2: 64×64 + b2<br/>ReLU"]
+    H2 --> V["Wv: 64×1 + bv<br/>Value V(s)"]
+    H2 --> AH["Wa: 64×21 + ba<br/>Advantage A(s, ·)"]
+    V --> Q["Q(s, ·) = V + A − A.mean()"]
+    AH --> Q
+    Q --> M{"argmax<br/>vs no_op + margin"}
+    M -->|"q[a*] ≥ q[no_op] + 3.0"| OUT["return a*"]
+    M -->|"otherwise"| OUT2["return no_op"]
+```
+
+
 Greedy policy over the Q-network output, with an optional **move-action margin gate**:
 
 ```
@@ -416,6 +573,28 @@ The margin gate addresses the empirical failure mode that an unregularized DQN t
 ## 7. Training
 
 ### 7.1 Tabular Q-learning (`q_learning.py:63`)
+
+```mermaid
+flowchart TD
+    A["Init q_table = {}<br/>visit_counts = {}<br/>ε ← 0.35"] --> B["Sample training day d ~ U(396)"]
+    B --> C[env.reset]
+    C --> D["s ← state_encoder(obs)"]
+    D --> E{"rng.random() &lt; ε?"}
+    E -->|yes, exploring| F1{"rng.random() &lt;<br/>heuristic_bias?"}
+    F1 -->|yes| F2["a ← heuristic.select_action"]
+    F1 -->|no| F3["a ← rng.integers(|A|)"]
+    E -->|no, exploiting| G["a ← argmax q_table[s]"]
+    F2 --> H[env.step a]
+    F3 --> H
+    G --> H
+    H --> I["target = r + γ · max q_table[s']<br/>q_table[s][a] += α · (target − q_table[s][a])"]
+    I --> J{"done?"}
+    J -->|no| D
+    J -->|yes| K["ε ← max(ε_min, ε · 0.995)"]
+    K --> L{"all 10000 episodes done?"}
+    L -->|no| B
+    L -->|yes| M[serialize q_table + visit_counts + demand_profile]
+```
 
 Standard ε-greedy Q-learning over discretized states. Pseudocode:
 
@@ -466,6 +645,31 @@ Key knobs (current `configs/training.yaml`):
 Per training episode, the metrics CSV records `total_reward`, `served_trips`, `unmet_demand`, `moved_bikes`, `overflow_bikes`, `epsilon`, and three exploration counters: `exploratory_actions`, `guided_exploration_actions`, `heuristic_match_actions` (how often the chosen action matched the heuristic).
 
 ### 7.2 NumPy DQN (`dqn.py:98`)
+
+```mermaid
+flowchart TD
+    A["Init online + target nets<br/>(He-normal weights)<br/>replay buffer = deque(20000)<br/>Adam state"] --> B["Sample training day d"]
+    B --> C[env.reset]
+    C --> D["φ(s) ← dense_encoder(obs)"]
+    D --> E{"rng.random() &lt; ε?"}
+    E -->|yes| F["heuristic-guided<br/>or random"]
+    E -->|no| G["a ← argmax Q_online(φ(s))"]
+    F --> H[env.step a]
+    G --> H
+    H --> I["replay.append(φ, a, r, φ', done)"]
+    I --> J{"buffer ≥ warmup<br/>and step % train_interval == 0?"}
+    J -->|yes| K["batch ← sample(64)<br/>a* = argmax Q_online(s', ·)<br/>y = r + γ·Q_target(s', a*)·(1−done)<br/>L = Huber(Q_online(s,a) − y)<br/>backprop + grad-clip + Adam"]
+    J -->|no| N
+    K --> N{"step % 100 == 0?"}
+    N -->|yes| O["target ← copy(online)"]
+    N -->|no| P{"episode done?"}
+    O --> P
+    P -->|no| D
+    P -->|yes| Q["ε ← max(ε_min, ε · 0.995)"]
+    Q --> R{"all 5000 episodes done?"}
+    R -->|no| B
+    R -->|yes| S[serialize network state + demand_profile]
+```
 
 The DQN is implemented from scratch in NumPy. No PyTorch or Jax dependency. The repo's `pyproject.toml` lists only `numpy, pandas, matplotlib, pyyaml`.
 
@@ -633,6 +837,23 @@ Random number generation uses `numpy.random.default_rng(seed)`. With identical s
 
 ## 10. Evaluation Protocol
 
+```mermaid
+flowchart LR
+    subgraph DAYS["423 daily episodes"]
+        TR["Train: 396 days<br/>2025-01-01 → 2026-01-31"]
+        TE["Test: 27 days<br/>2026-02-01 → 2026-02-28"]
+    end
+    TR -->|build_demand_profile| DP[DemandProfile<br/>7×24×5]
+    TR -->|train| QM[Q-table or<br/>DQN weights]
+    DP --> POL[Policies]
+    QM --> POL
+    POL -->|evaluate_policy / evaluate_dqn_policy| TR_M[Per-episode metrics<br/>train split]
+    POL -->|evaluate_policy / evaluate_dqn_policy| TE_M[Per-episode metrics<br/>test split]
+    TR_M --> AGG[summarize_metrics]
+    TE_M --> AGG
+    AGG --> JSON[_experiment_summary.json<br/>+ training_metrics.csv<br/>+ policy_evaluation.csv]
+```
+
 ### 10.1 Standard Run
 
 For each evaluation split (train and test):
@@ -683,6 +904,14 @@ Test split (27 episodes, 5 stations, 24 hours/day):
 
 The Q-policy with heuristic fallback effectively *is* the heuristic on this holdout: out of 24 hourly decisions per episode, the Q-table is consulted on average only 0.04 of them — i.e., **0.17% of decisions** use a learned value. The other 99.83% come from the embedded heuristic action.
 
+![Reward decomposition by policy on the Feb-2026 holdout](../../outputs/figures/technical_report/reward_decomposition.png)
+
+The reward decomposition makes the structural difference visible. Both no-op and the heuristic earn the bulk of their reward from served trips, then pay for unmet and overflow. The no-op baseline pays a much larger unmet-demand penalty (12.48 unmet × 2.0 = −24.96) and gets correspondingly fewer served trips. The heuristic and Q+fallback look nearly identical because the latter *is* the heuristic on 99.83% of decisions; the small difference comes from the 0.04 trusted-Q decisions per episode disagreeing with the heuristic and slightly reducing reward.
+
+![Movement intensity by policy](../../outputs/figures/technical_report/move_distribution.png)
+
+Per-episode move counts: no-op = 0 by definition, heuristic averages 9.11 (i.e., the four-guard policy chooses to move on roughly 3 of the 24 hours per day, transferring 3 bikes each time), and Q+fallback nearly matches at 9.22 — again because it is mostly executing the heuristic action.
+
 ### 11.2 Tabular Q Development Progression
 
 Within-February split, 21-train / 7-test mini-holdout (small-N, but useful for relative ordering):
@@ -714,6 +943,8 @@ To test the hypothesis that the v4 result was coverage-limited rather than value
 | Q v1 (11-tuple, no exogenous) | 115.78 | 10.19 | 14.33 | **14.48** | 9.52 |
 
 Source: `outputs/logs/jc_2025_full_year_to_202602_holdout_coarse_v1_experiment_summary.json`.
+
+![Coverage experiment: shrinking the state fixes consultation rate but not reward](../../outputs/figures/technical_report/coverage_experiment.png)
 
 Coverage rose **from 0.17% to 60.3%** as predicted — the Q-table is actually consulted now. But the Q-policy *underperforms* the heuristic by 6.7 reward points and the v4 Q+fallback by 6.4 points. Interpretation: the v4 Q+fallback's 122.21 was the heuristic in disguise; once coverage is real, the learned values themselves are no better than the heuristic. The bottleneck for tabular Q is therefore **value quality** at this episode budget, not coverage.
 
@@ -757,6 +988,10 @@ Hyperparameters: 5000 episodes, lr=5e-4, replay=20000, heuristic_bias=0.5.
 
 The 95% CI on the mean is **[114.35, 120.14]** — entirely below the heuristic's 122.45. Seed 7 reproduces the report exactly. **1/8 seeds beats the heuristic; 7/8 do not. All 8 beat the baseline.**
 
+![DQN 8-seed sweep distribution at report config](../../outputs/figures/technical_report/dqn_seed_sweep.png)
+
+The 8 seeds are visualized above as a strip plot. The 95% CI on the mean (shaded band) does not reach the heuristic line; only seed 7 lies above it. This is the strongest available evidence that the report's headline 123.63 is a lucky-seed effect rather than a stable property of the algorithm.
+
 The conclusion: the report's headline 123.63 is not a stable property of the method. It is the maximum over 8 seeds of a distribution whose mean lies below the heuristic. RL adds value over no-op, but not robustly over a one-step look-ahead heuristic at this problem size.
 
 Sources: `outputs/tables/dqn_seed_sweep/dqn_margin_8seed_sweep_summary.csv` (Sweep A) and `outputs/tables/dqn_seed_sweep/dqn_repcfg_8seed_summary.csv` (Sweep B).
@@ -778,6 +1013,31 @@ The margin gate cuts gratuitous moves (44.63 → 20.07) while leaving served tri
 ## 12. Diagnosis
 
 The repository contains three distinct learners (tabular Q v4, tabular Q v1, DQN). Each fails to robustly beat the heuristic for a different reason:
+
+```mermaid
+flowchart TD
+    A["Method underperforms<br/>heuristic on test split"] --> B{"Is the learned<br/>policy actually consulted?"}
+    B -->|"&lt; 5% of decisions<br/>(e.g. tabular v4: 0.17%)"| C["Coverage-bound<br/>state cardinality &gt;&gt; samples<br/><br/>Fix: shrink state encoder"]
+    B -->|"yes, most decisions"| D{"Does it match<br/>the heuristic?"}
+    D -->|"approx. yes"| E["Approximating heuristic<br/>but not exceeding<br/><br/>Need new structure beyond<br/>(dow, hour) periodicity"]
+    D -->|"deviates often<br/>but underperforms"| F{"High variance<br/>across seeds?"}
+    F -->|"yes (e.g. DQN std ≈ 4)"| G["Variance-bound<br/>optimization basin lottery<br/><br/>Fix: ensemble / residual<br/>learning / margin sweep<br/>on train split"]
+    F -->|"no, single-seed bad"| H["Value-bound<br/>noisy estimates with<br/>weak inductive prior<br/><br/>Fix: stronger prior<br/>(e.g. residual)"]
+
+    classDef cov fill:#fde68a,stroke:#92400e
+    classDef val fill:#fecaca,stroke:#991b1b
+    classDef var fill:#bbf7d0,stroke:#065f46
+    class C cov
+    class E val
+    class H val
+    class G var
+```
+
+Mapping to the three concrete failure modes observed in this repo:
+
+- **Tabular Q v4** → **coverage-bound** (path B → C). 17-tuple state, 0.04 trusted-Q decisions per 24-hour episode. Fixed by shrinking to v1.
+- **Tabular Q v1** → **value-bound** (path B → D → F → H). 60.3% coverage but learned values worse than the one-step heuristic.
+- **DQN** → **variance-bound** (path B → D → F → G). Function approximation removes the coverage problem; bottleneck is seed-to-seed optimization variance.
 
 ### 12.1 Tabular Q v4 — Coverage-bound
 
