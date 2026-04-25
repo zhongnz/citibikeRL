@@ -516,7 +516,50 @@ Reads the `heuristic_action` integer embedded at position 3 of any forecast-awar
 
 ### 6.3 DemandProfilePolicy (`policies.py:65`)
 
-The strong heuristic. Decision flow:
+The strong heuristic. The decision rule per step is:
+
+```
+balance[i]   =  I[i]  +  E[arrivals_{dow,t,i}]  −  E[departures_{dow,t,i}]   for each station i
+source       =  argmax_i  balance[i]   (predicted highest end-of-hour inventory)
+destination  =  argmin_i  balance[i]   (predicted lowest, possibly negative)
+```
+
+Then four feasibility guards (see flow below) decide whether to actually issue the move or fall back to `no_op`.
+
+Note carefully: the rule does **not** sort stations by their demand. It sorts them by the *net* of current inventory + predicted arrivals − predicted departures. A high-demand station that is *also* a high-arrivals station (a transit hub during morning rush) can have the largest balance and become the *source* of bikes, not their destination.
+
+Worked example with the project's actual demand profile, **Wednesday 08:00**:
+
+![How the heuristic chooses source and destination](../../outputs/figures/technical_report/heuristic_decision.png)
+
+| station | I | E[arrivals] | E[departures] | net flow | balance | role |
+|---|---:|---:|---:|---:|---:|---|
+| JC115 | 10 | 32.49 | 2.70 | +29.79 | **+39.79** | source |
+| HB101 | 10 |  7.82 | 2.05 |  +5.77 | +15.77 | |
+| HB106 | 10 | 11.61 | 2.53 |  +9.09 | +19.08 | |
+| JC009 |  5 |  2.74 | 8.93 |  −6.19 | **−1.19** | destination |
+| JC109 | 10 |  6.77 | 1.37 |  +5.40 | +15.40 | |
+
+JC115 is Grove Street PATH — at Wednesday 08:00 it receives ~32 bikes/hour from commuters arriving to ride PATH and only loses ~3. So even with the same starting inventory of 10, its predicted end-of-hour state is +39.79, far above any other station. The naive rule "station with high demand needs more bikes" would point at JC115 (high arrival demand), which is exactly wrong: JC115 is the station predicted to *overflow*, not stockout.
+
+JC009 is residential — at the same time it loses ~9 bikes/hour to outbound commuters and gains only ~3. With current inventory of 5 it ends the hour at predicted **−1.19**, meaning at least one would-be customer can't find a bike.
+
+Source = JC115, destination = JC009. The four guards check: source surplus = 39.79 > 0 ✓; destination shortage = +1.19 > 0 ✓; source surplus and inventory both ≥ 3 ✓; destination has room (5 < 17) ✓. Heuristic returns `(JC115 → JC009)` and the env transfers 3 bikes.
+
+What this single move buys, per `env.simulate_step_reward` semantics:
+
+| outcome | without move | with move |
+|---|---:|---:|
+| JC009 unmet trips | min(8.93, 5) = 5 served, 3.93 unmet | min(8.93, 8) = 8 served, 0.93 unmet |
+| JC115 overflow bikes | clip(10 − 2.70 + 32.49, 20) = +19.79 over | clip(7 − 2.70 + 32.49, 20) = +16.79 over |
+| reward components | −2.0·3.93 (unmet) − 0.5·19.79 (overflow) = **−17.76** | −2.0·0.93 (unmet) − 0.5·16.79 (overflow) − 0.05·3 (move) = **−10.41** |
+
+Net gain from this single move: **+7.35 reward**. Repeated three times per day on average (the heuristic moves on roughly 3 of 24 hours, see §11.1's move-distribution figure), this is the entire performance gap between the heuristic (122.45) and no-op (109.33).
+
+The crucial observation: this decision is **not** about JC009 having "high demand." JC009's demand (8.93 dep) is comparable to other residential stations. The decision is about JC009's *imbalance* — its predicted balance (−1.19) is the only negative value among the five stations at this hour. Demand alone wouldn't tell you that.
+
+Decision flow:
+
 
 ```mermaid
 flowchart TD

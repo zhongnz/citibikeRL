@@ -409,6 +409,67 @@ def fig_replay_buffer_dynamics() -> None:
     plt.close(fig)
 
 
+def fig_heuristic_decision() -> None:
+    src = Path("outputs/models/jc_2025_full_year_to_202602_holdout_weather_v1_q_learning_model.json")
+    if not src.exists():
+        print(f"  skipping fig_heuristic_decision: {src} not found")
+        return
+    payload = json.loads(src.read_text())
+    stations = payload["station_ids"]
+    departures = np.asarray(payload["demand_profile"]["departures"])
+    arrivals = np.asarray(payload["demand_profile"]["arrivals"])
+
+    dow, hr = 2, 8  # Wednesday 08:00
+    e_dep = departures[dow, hr]
+    e_arr = arrivals[dow, hr]
+
+    inventory = np.array([10, 10, 10, 5, 10], dtype=float)
+    balance = inventory + e_arr - e_dep
+    source = int(np.argmax(balance))
+    destination = int(np.argmin(balance))
+
+    fig, axes = plt.subplots(1, 2, figsize=(13, 4.6))
+    x = np.arange(len(stations))
+    width = 0.27
+
+    ax = axes[0]
+    ax.bar(x - width, inventory, width, label="current inventory I", color=PALETTE["gray"])
+    ax.bar(x, e_arr, width, label="E[arrivals]", color=PALETTE["teal"])
+    ax.bar(x + width, e_dep, width, label="E[departures]", color=PALETTE["rust"])
+    ax.set_xticks(x)
+    ax.set_xticklabels(stations)
+    ax.set_ylabel("Bikes / next hour")
+    ax.set_title("Inputs at Wed 08:00 (real demand profile, illustrative inventory)")
+    ax.grid(axis="y", alpha=0.3)
+    ax.legend(loc="upper right")
+
+    ax = axes[1]
+    colors = [PALETTE["navy"]] * len(stations)
+    colors[source] = PALETTE["amber"]
+    colors[destination] = PALETTE["rust"]
+    bars = ax.bar(stations, balance, color=colors, edgecolor="black", linewidth=0.4)
+    ax.axhline(0, color="black", linewidth=1)
+    for bar, val in zip(bars, balance):
+        ax.text(bar.get_x() + bar.get_width() / 2,
+                val + (0.8 if val >= 0 else -1.5),
+                f"{val:+.2f}",
+                ha="center", fontsize=9,
+                fontweight="bold" if val == balance[source] or val == balance[destination] else "normal")
+    ax.set_ylabel("balance = I + E[arrivals] − E[departures]")
+    ax.set_title(f"Heuristic picks source = {stations[source]} (max), dest = {stations[destination]} (min)")
+    legend_elements = [
+        plt.Rectangle((0, 0), 1, 1, color=PALETTE["amber"], label=f"source = {stations[source]}"),
+        plt.Rectangle((0, 0), 1, 1, color=PALETTE["rust"], label=f"destination = {stations[destination]}"),
+    ]
+    ax.legend(handles=legend_elements, loc="upper right")
+    ax.grid(axis="y", alpha=0.3)
+
+    fig.suptitle("How the heuristic chooses source and destination", fontsize=12, fontweight="bold")
+    fig.tight_layout()
+    fig.savefig(FIG_DIR / "heuristic_decision.png", dpi=150)
+    plt.close(fig)
+
+
 def main() -> None:
     print(f"Writing figures to {FIG_DIR}")
     fig_selected_stations()
@@ -422,6 +483,7 @@ def main() -> None:
     fig_huber_vs_mse()
     fig_dqn_loss_curve()
     fig_replay_buffer_dynamics()
+    fig_heuristic_decision()
     print("Done.")
 
 
