@@ -311,6 +311,104 @@ def fig_state_encoder_growth() -> None:
     plt.close(fig)
 
 
+def fig_huber_vs_mse() -> None:
+    x = np.linspace(-3.0, 3.0, 601)
+    mse = 0.5 * x**2
+    huber = np.where(np.abs(x) <= 1.0, 0.5 * x**2, np.abs(x) - 0.5)
+
+    fig, axes = plt.subplots(1, 2, figsize=(11, 4.2))
+
+    axes[0].plot(x, mse, label="MSE  =  0.5 · δ²", color=PALETTE["rust"], linewidth=2.2)
+    axes[0].plot(x, huber, label="Huber(δ)", color=PALETTE["navy"], linewidth=2.2)
+    axes[0].axvline(1, color="gray", linestyle=":", alpha=0.6)
+    axes[0].axvline(-1, color="gray", linestyle=":", alpha=0.6)
+    axes[0].set_xlabel("TD error  δ  =  Q_online(s, a) − y")
+    axes[0].set_ylabel("Loss value")
+    axes[0].set_title("Huber stays linear past |δ| = 1; MSE keeps growing quadratically")
+    axes[0].grid(alpha=0.3)
+    axes[0].legend(loc="upper center")
+
+    mse_grad = x
+    huber_grad = np.clip(x, -1.0, 1.0)
+    axes[1].plot(x, mse_grad, label="dMSE/dδ  =  δ", color=PALETTE["rust"], linewidth=2.2)
+    axes[1].plot(x, huber_grad, label="dHuber/dδ  =  clip(δ, ±1)", color=PALETTE["navy"], linewidth=2.2)
+    axes[1].axhline(0, color="black", linewidth=0.5)
+    axes[1].axvline(1, color="gray", linestyle=":", alpha=0.6)
+    axes[1].axvline(-1, color="gray", linestyle=":", alpha=0.6)
+    axes[1].set_xlabel("TD error  δ")
+    axes[1].set_ylabel("Gradient of loss w.r.t. δ")
+    axes[1].set_title("Huber gradient saturates at ±1 — robust to outlier TD errors")
+    axes[1].grid(alpha=0.3)
+    axes[1].legend(loc="upper left")
+
+    fig.tight_layout()
+    fig.savefig(FIG_DIR / "huber_vs_mse.png", dpi=150)
+    plt.close(fig)
+
+
+def fig_dqn_loss_curve() -> None:
+    src = Path("outputs/tables/dqn_seed_sweep/dqn_repcfg_seed7_training.csv")
+    if not src.exists():
+        print(f"  skipping fig_dqn_loss_curve: {src} not found")
+        return
+    df = pd.read_csv(src)
+    df = df[df["gradient_updates"] > 0].copy()
+    rolling = df["avg_loss"].rolling(window=50, min_periods=1).mean()
+
+    fig, ax = plt.subplots(figsize=(10, 4.2))
+    ax.plot(df["training_episode"], df["avg_loss"], color=PALETTE["violet"], alpha=0.35,
+            linewidth=0.7, label="per-episode mean Huber loss")
+    ax.plot(df["training_episode"], rolling, color=PALETTE["navy"], linewidth=2.0,
+            label="50-episode rolling mean")
+    ax.set_yscale("log")
+    ax.set_xlabel("Training episode")
+    ax.set_ylabel("Mean Huber loss per episode (log scale)")
+    ax.set_title("DQN training loss trajectory (seed 7, 5000 episodes)")
+    ax.grid(alpha=0.3, which="both")
+    ax.legend(loc="upper right")
+    fig.tight_layout()
+    fig.savefig(FIG_DIR / "dqn_loss_curve.png", dpi=150)
+    plt.close(fig)
+
+
+def fig_replay_buffer_dynamics() -> None:
+    capacity = 20_000
+    warmup = 256
+    horizon = 24
+    n_episodes = 5000
+    steps_per_episode = horizon
+    episodes = np.arange(0, n_episodes + 1)
+    fill = np.minimum(episodes * steps_per_episode, capacity)
+    train_starts_at = np.searchsorted(fill, warmup)
+
+    fig, ax = plt.subplots(figsize=(10, 4.2))
+    ax.fill_between(episodes, 0, fill, color=PALETTE["navy"], alpha=0.18, label="buffer fill")
+    ax.plot(episodes, fill, color=PALETTE["navy"], linewidth=1.5)
+    ax.axhline(capacity, color=PALETTE["rust"], linestyle="--", linewidth=1.4,
+               label=f"capacity = {capacity:,}")
+    ax.axhline(warmup, color=PALETTE["amber"], linestyle=":", linewidth=1.4,
+               label=f"warmup threshold = {warmup}")
+    ax.axvline(train_starts_at, color=PALETTE["gray"], linestyle=":", alpha=0.6)
+    ax.text(train_starts_at + 80, capacity * 0.55,
+            f"training begins\n(episode ≈ {train_starts_at})",
+            fontsize=9, color=PALETTE["gray"])
+    cap_reached = int(np.ceil(capacity / steps_per_episode))
+    ax.axvline(cap_reached, color=PALETTE["gray"], linestyle=":", alpha=0.6)
+    ax.text(cap_reached + 80, capacity * 0.92,
+            f"FIFO eviction starts\n(episode ≈ {cap_reached})",
+            fontsize=9, color=PALETTE["gray"])
+    ax.set_xlim(0, n_episodes)
+    ax.set_ylim(0, capacity * 1.08)
+    ax.set_xlabel("Training episode")
+    ax.set_ylabel("Replay buffer size (# transitions)")
+    ax.set_title("Replay buffer fill curve — warmup gates training, capacity gates retention")
+    ax.grid(alpha=0.3)
+    ax.legend(loc="lower right")
+    fig.tight_layout()
+    fig.savefig(FIG_DIR / "replay_buffer_dynamics.png", dpi=150)
+    plt.close(fig)
+
+
 def main() -> None:
     print(f"Writing figures to {FIG_DIR}")
     fig_selected_stations()
@@ -321,6 +419,9 @@ def main() -> None:
     fig_move_distribution()
     fig_action_space()
     fig_state_encoder_growth()
+    fig_huber_vs_mse()
+    fig_dqn_loss_curve()
+    fig_replay_buffer_dynamics()
     print("Done.")
 
 

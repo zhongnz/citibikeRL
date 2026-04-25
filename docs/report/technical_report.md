@@ -316,6 +316,29 @@ Default coefficients (from `configs/environment.yaml`):
 
 Episode reward is `Σ_{t=0}^{23} r_t`, in the range roughly [80, 160] for the chosen station subset under any sensible policy. The relative weighting (unmet > overflow > moved) is what makes the policies non-trivial: more aggressive movement reduces unmet but adds movement and potentially overflow penalties.
 
+#### Worked example of one step's reward
+
+To make the formula concrete, suppose at hour `t = 8` of some weekday:
+
+- Inventory entering the step: `I = (12, 4, 18, 9, 7)` (5 stations).
+- The agent picks action `(JC115 → HB101)`, attempting to move 3 bikes from station 0 to station 1.
+- Demand for this hour: `departures = (3, 5, 0, 2, 1)`, `arrivals = (2, 4, 0, 1, 3)`.
+
+Step-by-step reward calculation, exactly as `env.py:75–98` does it:
+
+| step | computation | result |
+|---|---|---|
+| Apply action | `move = min(3, I[0]=12, capacity−I[1]=20−4=16) = 3`; `I ← (9, 7, 18, 9, 7)` | `moved = 3` |
+| Served | `served = min(I, departures) = min((9, 7, 18, 9, 7), (3, 5, 0, 2, 1)) = (3, 5, 0, 2, 1)` | `Σ served = 11` |
+| Unmet | `unmet = departures − served = (0, 0, 0, 0, 0)` | `Σ unmet = 0` |
+| Update inventory | `I ← I − served + arrivals = (8, 6, 18, 8, 9)` | (no overflow at any station; capacity = 20) |
+| Overflow | `overflow = max(I − 20, 0) = (0, 0, 0, 0, 0)` | `Σ overflow = 0` |
+| Reward | `+1.0·11 − 2.0·0 − 0.05·3 − 0.5·0` | `r_t = 10.85` |
+
+This is one of the agent's "good hours": served 11 trips, no unmet, paid only `0.05 × 3 = 0.15` for the move. Sum 24 of these per episode, with most contributing positive reward and a few losing to unmet/overflow at imbalanced hours, and you land in the `[80, 160]` per-episode range observed empirically.
+
+The reward function is **dense per step** (every hour produces a reward, not just terminal) and **decomposable** (each term independently linear in its count), which makes credit assignment for both Q-learning and DQN tractable. §11.1's reward-decomposition figure visualizes how each policy splits its episode reward across the four terms.
+
 ### 4.6 Initial State
 
 At `env.reset(episode_index)`:
@@ -702,24 +725,166 @@ else:
 
 For a 54-dim input and 21 actions: parameters are `54·64 + 64 + 64·64 + 64 + 64·1 + 1 + 64·21 + 21 ≈ 5,950`. Initialization is He-normal scaled by `√(2/fan_in)` for each weight matrix, biases zero.
 
-#### 7.2.2 Loss and Optimization
+#### 7.2.2 The TD error, the Huber loss, and the target network
 
-Loss is **Huber** (smooth L1) on the TD error of the chosen action's Q-value. With **Double DQN** target selection enabled by default:
+This is the conceptual heart of DQN, so it gets a longer treatment.
+
+**Step 1 — what is the TD error?** The Bellman optimality equation says
 
 ```
-a*  = argmax_{a'} Q_online(s', a')
-y   = r + γ · (1 − done) · Q_target(s', a*)
-δ   = Q_online(s, a) − y
-L   = mean(huber(δ))
+Q*(s, a)  =  r  +  γ · max_{a'} Q*(s', a')
 ```
 
-If `double_dqn=False`, the target uses `max_{a'} Q_target(s', a')`. The target network is hard-copied from the online network every `target_update_interval` env steps (default 100).
+i.e. the optimal action-value at `(s, a)` equals the immediate reward plus the discounted optimal value at the next state. **Q-learning treats this as a fixed-point equation and tries to make its current estimate satisfy it on average.** It does so by computing, on every transition, the gap between the two sides:
 
-Backprop is hand-coded for both the dueling and non-dueling heads, then the two-layer ReLU stack. Adam with `β1=0.9, β2=0.999, ε=1e-8` updates weights (`_apply_gradients_adam`, `dqn.py:615`). Global gradient norm clipping at `gradient_clip` (default 5.0) is applied before the Adam step.
+```
+δ  =  Q(s, a)  −  ( r  +  γ · max_{a'} Q(s', a') )
+       └─current estimate─┘   └────────TD target────────┘
+```
 
-#### 7.2.3 Replay Buffer
+This `δ` is the **temporal-difference (TD) error**. "Temporal" because it compares the estimate at time `t` to a one-step-later estimate; "difference" because it's a subtraction. If `δ > 0`, our `Q(s, a)` is too high; if `δ < 0`, too low. The squared TD error is the loss; gradient descent on it nudges `Q(s, a)` toward the target `r + γ · max_{a'} Q(s', a')`.
 
-A `collections.deque` of fixed `replay_capacity` holding `(state_vector, action, reward, next_state_vector, done)`. Sampling is uniform without replacement at batch size `batch_size`. Training begins only after the buffer accumulates `replay_warmup` transitions and on every `train_interval`-th env step thereafter.
+In tabular Q-learning the same logic appears in closed form: `Q(s, a) ← Q(s, a) − α · δ`, which moves `Q(s, a)` along the negative gradient of `δ²/2`. DQN does the same thing except `Q` is now `Q(·; θ)` and we backpropagate.
+
+**Step 2 — the moving-target problem.** A naive implementation uses the same parameters `θ` to compute both `Q(s, a; θ)` (the prediction) *and* `max_{a'} Q(s', a'; θ)` (the target). Now every gradient step changes the target — the very thing the prediction is chasing. This creates a feedback loop that, combined with off-policy sampling and function approximation, often diverges (the "deadly triad").
+
+**Step 3 — the target network as a fix.** Maintain two copies of the network:
+
+```mermaid
+flowchart LR
+    subgraph TR[Training step]
+        S[s, a, r, s', done] -->|"Q_online(s, a; θ)"| P[predicted]
+        S -->|"Q_online(s', ·; θ)"| AS["argmax<br/>(Double DQN)"]
+        S -->|"Q_target(s', ·; θ_target)"| TG[target evaluation]
+        AS --> Y["y = r + γ · (1−done) · Q_target(s', a*)"]
+        TG --> Y
+        P --> D["δ = predicted − y"]
+        Y --> D
+        D -->|"Huber loss<br/>+ Adam step"| ON["update θ (online only)"]
+    end
+    ON -.->|"every 100 env steps:<br/>θ_target ← θ"| TG
+```
+
+`θ_online` is updated every gradient step. `θ_target` is *frozen* and used only to compute the TD target. Periodically (every `target_update_interval = 100` env steps in this project), `θ_target` is hard-copied from `θ_online`. The target therefore moves in discrete jumps separated by 100 steps of online-network drift, instead of moving continuously with every gradient. Empirically this is enough to break the divergence loop.
+
+The implementation is two lines of Python:
+
+```python
+target_state = _copy_network_state(online_state)              # initial sync
+...
+if total_steps % training_config.target_update_interval == 0:  # every 100 steps
+    target_state = _copy_network_state(online_state)
+```
+
+(`dqn.py:130` and `dqn.py:200`.)
+
+**Step 4 — putting it all together with Double DQN target selection.** With `double_dqn = True` (the project default):
+
+```
+a*  =  argmax_{a'}  Q_online(s', a';  θ_online)         # online network picks the action
+y   =  r  +  γ · (1 − done) · Q_target(s', a*; θ_target) # target network evaluates it
+δ   =  Q_online(s, a;  θ_online)  −  y                   # TD error on chosen action
+L   =  mean over batch of Huber(δ)                       # loss
+```
+
+The two networks have explicit roles: online picks, target evaluates. This decouples action selection from value evaluation, which (as discussed in §7.2's improvements) reduces overestimation bias.
+
+If `double_dqn = False`, the target reduces to `r + γ · (1 − done) · max_{a'} Q_target(s', a')` — same target network, but action selection happens by `argmax` over the target itself.
+
+**Step 5 — why Huber and not MSE?**
+
+![Huber vs MSE: loss values and gradients](../../outputs/figures/technical_report/huber_vs_mse.png)
+
+Mean-squared error `(δ²/2)` is the natural choice for a regression loss but has a problem in DQN: TD errors can be large early in training (the network's initial Q estimates are essentially random), and squared loss amplifies large errors quadratically. Their gradients dominate the minibatch and destabilize the small network.
+
+The **Huber loss** is quadratic for `|δ| ≤ 1` and linear beyond:
+
+```
+Huber(δ)  =  ½ δ²              if |δ| ≤ 1
+             |δ| − ½           otherwise
+```
+
+Its gradient is just `clip(δ, −1, 1)` — outliers contribute exactly ±1 to the gradient instead of ±10 or ±100. Robust to bad bootstrap targets, smooth at zero, identical to MSE locally. Standard choice in DQN; implemented at `dqn.py:643`:
+
+```python
+def _huber_loss(td_error):
+    abs_error = np.abs(td_error)
+    quadratic = np.minimum(abs_error, 1.0)
+    linear = abs_error - quadratic
+    return float(np.mean(0.5 * quadratic * quadratic + linear))
+```
+
+**Step 6 — what the loss curve actually looks like in practice.**
+
+![DQN training-loss trajectory across 5000 episodes](../../outputs/figures/technical_report/dqn_loss_curve.png)
+
+This is the per-episode mean Huber loss for seed 7 of the report-config sweep. It drops from ~10 in the first hundred episodes to ~0.05 by the end, with no divergence — exactly the stable trajectory the target network and Huber loss are designed to produce. The remaining noise is the natural variance of a stochastic gradient with batch size 64 over 24-step episodes.
+
+**Step 7 — optimization and gradient clipping.** Backprop is hand-coded for both the dueling and non-dueling heads, then through the two-layer ReLU stack. Adam (`β1 = 0.9, β2 = 0.999, ε = 1e-8`) updates weights (`_apply_gradients_adam`, `dqn.py:615`). A **global gradient-norm clip** at `gradient_clip = 5.0` is applied before the Adam step: if the total L2 norm of all gradients exceeds 5.0, every gradient is rescaled by `5.0 / total_norm`. This is a final guardrail against rare gradient spikes that get past the Huber loss.
+
+#### 7.2.3 The replay buffer
+
+Why does DQN need a buffer at all? Why not just train on each transition as it happens?
+
+Two reasons, both about the gradient's quality.
+
+**Reason 1 — sample correlation.** Consecutive transitions in an RL episode are highly correlated: hour 8 leads to hour 9 leads to hour 10 of the same day, with the same demand pattern, similar inventory, and an action chosen by a policy that hardly changed between steps. SGD theory assumes IID samples; correlated samples produce biased gradient estimates and unstable optimization. Sampling minibatches *uniformly at random* from a large buffer breaks the correlation — a typical batch mixes early-day and late-day transitions across many different days and many epochs of policy quality.
+
+**Reason 2 — sample reuse.** A single env step is computationally cheap (just look up demand and update inventory) but each transition contains real learning signal. Throwing it away after one gradient update wastes data. A buffer of capacity 20,000 with 64-batch training every step means each transition is sampled, in expectation, ~64 times before being evicted by FIFO — a roughly 64× boost in sample efficiency.
+
+A third, subtler benefit: the buffer's **distribution shifts slowly**. Policy updates happen quickly, but the buffer mixes data from the last several hundred episodes, so the network sees a roughly stationary input distribution. Neural nets dislike non-stationary inputs (catastrophic forgetting). The buffer acts as a low-pass filter on the data distribution.
+
+The full lifecycle:
+
+```mermaid
+flowchart LR
+    subgraph EP["Each env step"]
+        S1[env state s, action a] --> S2[env.step]
+        S2 --> S3["transition<br/>(s, a, r, s', done)"]
+    end
+    S3 -->|append, FIFO eviction at capacity 20000| BUF[("Replay buffer<br/>deque(maxlen=20000)")]
+    BUF -->|"random sample<br/>batch_size = 64<br/>(only if buffer ≥ 256 warmup)"| BATCH[Minibatch]
+    BATCH -->|forward + Huber + Adam| GRAD["gradient step on θ_online"]
+    GRAD -.->|"every 100 steps:<br/>θ_target ← θ_online"| TGT[Target network]
+    TGT -.->|"used in next sample's<br/>TD target computation"| BATCH
+```
+
+In code (`dqn.py:132`):
+
+```python
+replay_buffer = deque(maxlen=training_config.replay_capacity)   # 20_000 by default
+
+# inside the env-step loop:
+replay_buffer.append((state_vector.copy(), int(action), float(reward),
+                     next_state_vector.copy(), float(done)))
+
+# train only when the buffer has enough samples:
+if len(replay_buffer) >= training_config.replay_warmup \
+        and total_steps % training_config.train_interval == 0:
+    batch = _sample_replay_batch(replay_buffer, training_config.batch_size, rng)
+    loss = _train_dqn_batch(...)
+```
+
+Three timing knobs control buffer-driven training:
+
+| knob | default | role |
+|---|---|---|
+| `replay_warmup` | 256 | minimum buffer size before training begins. Avoids gradient steps on a near-empty buffer that would otherwise overfit to ten transitions. |
+| `replay_capacity` | 20,000 | maximum buffer size. Once exceeded, oldest transitions are evicted (FIFO). |
+| `train_interval` | 1 | env steps between gradient updates. `1` means one gradient step per env step (after warmup); larger values train less frequently. |
+
+**Buffer fill curve over training:**
+
+![Replay buffer fill across 5000 training episodes](../../outputs/figures/technical_report/replay_buffer_dynamics.png)
+
+For 24-step episodes the buffer fills at ~24 transitions per episode. Warmup (256 transitions) is reached after ~11 episodes, so the first ~10 episodes generate experience without any gradient updates. Capacity (20,000 transitions) is reached after ~833 episodes, after which FIFO eviction kicks in: each new transition pushes out the oldest. By the end of 5000 episodes, the buffer holds the most recent ~833 episodes' worth of transitions — a substantial slice of recent policy history but not the random-policy data from training onset, which by then has been overwritten.
+
+**A word on alternatives.** This project uses **uniform random sampling** from the buffer. Two well-known refinements exist:
+
+- **Prioritized Experience Replay (PER, Schaul 2016)**: sample transitions in proportion to `|δ|^α`, prioritizing transitions where the network is most wrong. Often improves sample efficiency further but adds complexity (importance-sampling weights, sum-tree data structures).
+- **n-step returns**: replace `r + γ · Q_target(s', ·)` with `Σ_{k=0}^{n-1} γ^k r_{t+k} + γ^n · Q_target(s_{t+n}, ·)`, mixing the bootstrap target with multi-step Monte Carlo returns. Reduces bootstrap bias at the cost of variance.
+
+Neither is implemented here; the project's DQN uses the canonical 1-step uniform-replay form.
 
 #### 7.2.4 ε-greedy with Heuristic Guidance
 
